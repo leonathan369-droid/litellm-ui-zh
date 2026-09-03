@@ -23,12 +23,15 @@ export LITELLM_UI_PATH="$HOME/.config/litellm/ui-zh"
 ```
 
 目前已在 macOS 上验证 LiteLLM `1.99.0`：安装器可完成 UI 复制和 51 个 HTML 路由的
-注入，`check` 校验通过，浏览器中可加载翻译覆盖层。Linux、Windows 以及其他 LiteLLM
-版本仍欢迎提交兼容性反馈。
+注入，`check` 校验通过，浏览器中可加载翻译覆盖层。完整的验证范围和状态说明见
+<https://github.com/leonathan369-droid/litellm-ui-zh/blob/main/docs/compatibility.md>；Linux、
+Windows 以及其他 LiteLLM 版本仍欢迎提交兼容性反馈。
 
 这是社区补丁，不是 LiteLLM 官方发布。遇到未翻译文本、安装问题或升级兼容性问题，请
 使用仓库 Issue 表单报告：<https://github.com/leonathan369-droid/litellm-ui-zh/issues>。
 提交前请脱敏，绝不要发布 API Key、`MASTER_KEY`、数据库 URL、Cookie、完整配置或
 未脱敏日志。
+
+如果这个项目对你有帮助，欢迎点个 Star。
 
 仓库地址：<https://github.com/leonathan369-droid/litellm-ui-zh>

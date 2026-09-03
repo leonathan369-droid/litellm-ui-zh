@@ -91,7 +91,8 @@ python3 scripts/install.py restore --target "$HOME/.config/litellm/ui-zh"
 | 1.99.0 | macOS | 2026-09-03 | installer + check passed | browser UI manually checked |
 
 尚未验证 Linux 或 Windows。升级 LiteLLM 前保留当前 UI 目录；升级后重新运行安装器或
-`check`，并检查你常用的 WebUI 路由。
+`check`，并检查你常用的 WebUI 路由。完整的验证范围、状态定义和反馈入口见
+[版本兼容性记录](docs/compatibility.md)。
 
 ## 团队管理员说明
 
