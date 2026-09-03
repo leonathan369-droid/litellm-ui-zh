@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Support and safe reporting guidance
+    url: https://github.com/leonathan369-droid/litellm-ui-zh/blob/main/SUPPORT.md
+    about: Run the self-check and review the redaction rules before reporting an issue.

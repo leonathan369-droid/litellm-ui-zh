@@ -1,0 +1,54 @@
+name: LiteLLM version compatibility report
+description: Report a regression or success after changing LiteLLM versions.
+title: "compatibility: "
+labels:
+  - compatibility
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not post API keys, master keys, passwords, database URLs, cookies,
+        access tokens, full configuration files, request content, or unredacted logs.
+        Redact screenshots, paths, hostnames, and diagnostics before submitting.
+  - type: input
+    id: previous-version
+    attributes:
+      label: Previous LiteLLM version
+      placeholder: 1.99.0
+    validations:
+      required: true
+  - type: input
+    id: target-version
+    attributes:
+      label: Target LiteLLM version
+      placeholder: 1.100.0
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and version
+      placeholder: Chrome 140
+    validations:
+      required: true
+  - type: input
+    id: route
+    attributes:
+      label: Affected LiteLLM WebUI route
+      placeholder: /ui/router-settings
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Describe the shortest safe sequence that reproduces the result.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized diagnostics
+      description: Include the check output and browser console information only after redacting private data.
+    validations:
+      required: true
