@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.1 - 2026-09-03
+
+- Added repository verification with GitHub Actions.
+- Added privacy-aware support, contribution, and issue-reporting guidance.
+- Improved Chinese-first onboarding, compatibility, rollback, and team-admin
+  documentation.
+- Added repository discoverability metadata and a manual Chinese announcement
+  draft.
+
 ## 0.1.0 - 2026-09-03
 
 - Initial Simplified Chinese translation overlay for the LiteLLM WebUI.
