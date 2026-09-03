@@ -8,6 +8,9 @@
 右下角提供 `中 / EN` 切换。This is an unofficial Simplified Chinese overlay,
 not a LiteLLM fork.
 
+如果这个项目对你有帮助，欢迎点个 Star。有意见、翻译建议或版本兼容性问题，欢迎通过
+[Issue](https://github.com/leonathan369-droid/litellm-ui-zh/issues) 反馈。
+
 ## 适合谁
 
 - 个人自部署 LiteLLM，想在不修改安装包的前提下使用中文界面。
@@ -53,6 +56,13 @@ API Key、`MASTER_KEY`、数据库 URL 或完整环境文件放入启动命令�
 
 打开 LiteLLM WebUI 后，常见管理界面文本会显示为简体中文；右下角 `中 / EN` 按钮可
 随时切回英文。修改不会影响 API 请求。
+
+### 界面预览
+
+下图为 LiteLLM `1.99.0` 的真实空状态界面，未包含密钥、请求内容、用量、日志或
+业务数据。
+
+![LiteLLM WebUI 简体中文预览：智能体列表空状态](docs/assets/litellm-ui-zh-preview.png)
 
 重启后运行校验：
 
