@@ -21,3 +21,4 @@ jobs:
       - run: python3 -m unittest discover -s tests -v
       - run: python3 -m py_compile scripts/install.py
       - run: node --check patches/litellm-zh.js
+      - run: node --test tests/test_translation.js

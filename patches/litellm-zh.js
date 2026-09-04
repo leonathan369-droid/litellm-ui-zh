@@ -2,10 +2,11 @@
   "use strict";
 
   var STORAGE_KEY = "litellm-ui-language";
+  var ORIGINAL_TEXT = "litellmZhOriginalText";
+  var ORIGINAL_ATTRIBUTE_PREFIX = "litellmZhOriginal";
   var translations = {
     "AI GATEWAY": "AI 网关",
     "AI Gateway": "AI 网关",
-    "Virtual Keys": "虚拟密钥",
     "Playground": "试用场",
     "Models + Endpoints": "模型与端点",
     "Agentic": "智能体",
@@ -74,7 +75,6 @@
     "Budget Reset": "预算重置",
     "Models": "模型",
     "No keys found": "未找到密钥",
-    "No results": "无结果",
     "Model Management": "模型管理",
     "Add and manage models for the proxy": "添加和管理代理模型",
     "All Models": "全部模型",
@@ -559,8 +559,6 @@
     ,"Create a password for your account": "为账户创建密码"
     ,"No results": "无结果"
     ,"Loading…": "加载中…"
-    ,"Loading...": "加载中…"
-    ,"Update": "更新"
     ,"Create Group": "创建分组"
     ,"Group Name": "分组名称"
     ,"Strategy": "策略"
@@ -584,6 +582,11 @@
   function translateNode(node, language) {
     if (node.nodeType === Node.TEXT_NODE) {
       if (node.parentElement && /^(SCRIPT|STYLE|NOSCRIPT|TEXTAREA|INPUT)$/.test(node.parentElement.tagName)) return;
+      if (language === "en" && Object.prototype.hasOwnProperty.call(node, ORIGINAL_TEXT)) {
+        if (node.nodeValue !== node[ORIGINAL_TEXT]) node.nodeValue = node[ORIGINAL_TEXT];
+        return;
+      }
+      if (!Object.prototype.hasOwnProperty.call(node, ORIGINAL_TEXT)) node[ORIGINAL_TEXT] = node.nodeValue;
       var translatedValue = translateText(node.nodeValue, language);
       if (translatedValue !== node.nodeValue) node.nodeValue = translatedValue;
       return;
@@ -591,6 +594,16 @@
     if (node.nodeType !== Node.ELEMENT_NODE) return;
     ["aria-label", "placeholder", "title"].forEach(function (attribute) {
       if (node.hasAttribute(attribute)) {
+        var originalAttribute = ORIGINAL_ATTRIBUTE_PREFIX + attribute;
+        if (language === "en" && Object.prototype.hasOwnProperty.call(node, originalAttribute)) {
+          if (node.getAttribute(attribute) !== node[originalAttribute]) {
+            node.setAttribute(attribute, node[originalAttribute]);
+          }
+          return;
+        }
+        if (!Object.prototype.hasOwnProperty.call(node, originalAttribute)) {
+          node[originalAttribute] = node.getAttribute(attribute);
+        }
         node.setAttribute(attribute, translateText(node.getAttribute(attribute), language));
       }
     });
