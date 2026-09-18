@@ -12,7 +12,7 @@
 - Expanded verification CI to Ubuntu and macOS on Python 3.11 and 3.13.
 - Added upstream stable-release monitoring, untranslated HTML candidate collection, and an allowlist-gated static-string compatibility check.
 - Added real-package LiteLLM v1.101.0 compatibility CI on Ubuntu and macOS, including process startup, served UI verification, and Linux Chromium smoke testing of dynamic translation, language restoration, and table-data protection.
-- Updated the Simplified Chinese dictionary for LiteLLM v1.101.0 Auto-Router, Agent/Skill Hub, Guardrail detail, and related UI changes.
+- Updated the Simplified Chinese dictionary for LiteLLM v1.101.0 Auto-Router, Agent/Skill Hub, Guardrail detail, login, and related UI changes.
 - Distinguished `VERIFIED` from `AUTOMATED_VERIFIED`.
 - Pinned first-party GitHub Actions to immutable commit SHAs.
 - Added architecture, maintenance, and security documentation.
