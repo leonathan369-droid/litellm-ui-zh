@@ -1,0 +1,55 @@
+name: Upstream Watch
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - id: upstream
+        name: Check latest stable LiteLLM release
+        run: python3 scripts/check_upstream.py --github-output "$GITHUB_OUTPUT"
+      - name: Open compatibility issue when needed
+        if: steps.upstream.outputs.update_available == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LATEST: ${{ steps.upstream.outputs.latest }}
+          VERIFIED: ${{ steps.upstream.outputs.verified }}
+          RELEASE_URL: ${{ steps.upstream.outputs.release_url }}
+        run: |
+          set -euo pipefail
+          title="Compatibility: LiteLLM v${LATEST}"
+          existing="$(gh issue list --state open --search "${title} in:title" --json title --jq '.[] | select(.title == "'"$title"'") | .title' | head -n 1)"
+          if [ -n "$existing" ]; then
+            echo "Compatibility issue already exists: $existing"
+            exit 0
+          fi
+          cat > /tmp/upstream-issue.md <<EOF
+          A newer stable LiteLLM release is available.
+
+          - Latest stable: `v${LATEST}`
+          - Latest verified here: `v${VERIFIED}`
+          - Upstream release: ${RELEASE_URL}
+
+          Maintenance checklist:
+          - [ ] Create/update a compatibility branch.
+          - [ ] Install the exact LiteLLM release in a clean environment.
+          - [ ] Run installer upgrade/check tests.
+          - [ ] Run `scripts/collect_strings.py` on the static UI.
+          - [ ] Review new/changed translations.
+          - [ ] Perform browser smoke tests on key routes.
+          - [ ] Update `compatibility/upstream.json` and `docs/compatibility.md`.
+          - [ ] Release only after manual verification.
+          EOF
+          gh issue create --title "$title" --body-file /tmp/upstream-issue.md
