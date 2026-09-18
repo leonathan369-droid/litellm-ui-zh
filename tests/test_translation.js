@@ -134,8 +134,19 @@ test("restores the exact original English when a Chinese translation is ambiguou
 });
 
 
-test("translates exact UI labels but does not translate matching substrings in user content", () => {
-  const exact = new TextNode("User");
+test("translates exact UI labels without translating table data or matching substrings", () => {
+  const label = new Element("label");
+  const labelText = new TextNode("User");
+  label.appendChild(labelText);
+
+  const table = new Element("table");
+  const row = new Element("tr");
+  const cell = new Element("td");
+  const userValue = new TextNode("User");
+  cell.appendChild(userValue);
+  row.appendChild(cell);
+  table.appendChild(row);
+
   const values = [
     "PageRank",
     "UserService",
@@ -145,9 +156,10 @@ test("translates exact UI labels but does not translate matching substrings in u
     "SaveGPT",
   ].map((value) => new TextNode(value));
 
-  createEnvironment([exact, ...values]);
+  createEnvironment([label, table, ...values]);
 
-  assert.equal(exact.nodeValue, "用户");
+  assert.equal(labelText.nodeValue, "用户");
+  assert.equal(userValue.nodeValue, "User");
   assert.deepEqual(
     values.map((node) => node.nodeValue),
     [

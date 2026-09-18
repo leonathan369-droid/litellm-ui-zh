@@ -8,6 +8,7 @@
   var TRANSLATABLE_ATTRIBUTES = ["aria-label", "placeholder", "title"];
   var TEXT_SKIP_TAGS = /^(SCRIPT|STYLE|NOSCRIPT|TEXTAREA|INPUT|SELECT|OPTION|PRE|CODE)$/;
   var ATTRIBUTE_SKIP_TAGS = /^(SCRIPT|STYLE|NOSCRIPT|PRE|CODE)$/;
+  var DATA_CELL_CONTROL_TAGS = /^(BUTTON|LABEL)$/;
 
   function hasOwn(object, key) {
     return Object.prototype.hasOwnProperty.call(object, key);
@@ -24,9 +25,20 @@
     return false;
   }
 
+  function isProtectedDataCellContext(element) {
+    var current = element;
+    while (current) {
+      if (DATA_CELL_CONTROL_TAGS.test(current.tagName || "")) return false;
+      if ((current.tagName || "") === "TD") return true;
+      current = current.parentElement;
+    }
+    return false;
+  }
+
   function shouldSkipText(node) {
     if (!node.parentElement) return false;
     if (isExplicitlyIgnored(node.parentElement)) return true;
+    if (isProtectedDataCellContext(node.parentElement)) return true;
     var current = node.parentElement;
     while (current) {
       if (TEXT_SKIP_TAGS.test(current.tagName || "")) return true;
@@ -37,6 +49,7 @@
 
   function shouldSkipAttributes(element) {
     if (isExplicitlyIgnored(element)) return true;
+    if (isProtectedDataCellContext(element)) return true;
     return ATTRIBUTE_SKIP_TAGS.test(element.tagName || "");
   }
 
