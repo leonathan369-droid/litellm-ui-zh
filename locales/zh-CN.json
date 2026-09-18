@@ -640,5 +640,8 @@
   "False Negatives": "假阴性",
   "Latency (p50)": "延迟（p50）",
   "Parameters": "参数",
-  "Called With": "调用参数"
+  "Called With": "调用参数",
+  "Notifications alt+T": "通知 alt+T",
+  "This page could not be found.": "找不到此页面。",
+  "404: This page could not be found.": "404：找不到此页面。"
 }

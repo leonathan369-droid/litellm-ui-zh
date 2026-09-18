@@ -1,0 +1,10 @@
+{
+  "allowed": [
+    "LiteLLM Dashboard",
+    "🚅 LiteLLM"
+  ],
+  "notes": {
+    "LiteLLM Dashboard": "Document title/product name; the body overlay does not translate the document title.",
+    "🚅 LiteLLM": "Product brand mark intentionally remains unchanged."
+  }
+}

@@ -61,16 +61,25 @@ jobs:
           grep -q "source version:     MATCH" "$RUNNER_TEMP/check.txt"
           grep -q "patch_checksum=OK" "$RUNNER_TEMP/diagnose.txt"
           python3 scripts/collect_strings.py "$target" --json > "$RUNNER_TEMP/strings.json"
-          python3 - "$RUNNER_TEMP/strings.json" <<'PY'
+          python3 - "$RUNNER_TEMP/strings.json" compatibility/static-unknown-allowlist.json <<'PY'
           import json
           import sys
 
           data = json.load(open(sys.argv[1], encoding="utf-8"))
-          print(json.dumps({
+          allowlist = json.load(open(sys.argv[2], encoding="utf-8"))
+          allowed = set(allowlist.get("allowed", []))
+          unexpected = sorted(set(data["unknown"]) - allowed)
+          missing_expected = sorted(allowed - set(data["unknown"]))
+          summary = {
               "candidate_count": data["candidate_count"],
               "unknown_count": data["unknown_count"],
-              "unknown_preview": data["unknown"][:20],
-          }, ensure_ascii=False))
+              "allowed_unknown_count": len(set(data["unknown"]) & allowed),
+              "unexpected_unknown": unexpected,
+              "allowlist_entries_not_observed": missing_expected,
+          }
+          print(json.dumps(summary, ensure_ascii=False))
+          if unexpected:
+              raise SystemExit("unexpected untranslated static HTML candidates found")
           PY
 
       - name: Install Chromium smoke-test runtime
@@ -118,9 +127,41 @@ jobs:
               page.goto("http://127.0.0.1:4000/ui/", wait_until="domcontentloaded", timeout=45000)
               page.wait_for_selector("#litellm-zh-toggle", timeout=30000)
               assert page.locator("html").get_attribute("lang") == "zh-CN"
+
+              # Exercise the live MutationObserver against dynamically added UI
+              # and verify exact-match protection for table data in a real browser.
+              page.evaluate("""
+              () => {
+                const button = document.createElement("button");
+                button.id = "litellm-zh-runtime-probe";
+                button.textContent = "Save";
+                document.body.appendChild(button);
+
+                const table = document.createElement("table");
+                table.id = "litellm-zh-data-probe";
+                const row = document.createElement("tr");
+                const cell = document.createElement("td");
+                cell.textContent = "User";
+                row.appendChild(cell);
+                table.appendChild(row);
+                document.body.appendChild(table);
+              }
+              """)
+              page.wait_for_function(
+                  "document.getElementById('litellm-zh-runtime-probe')?.textContent === '保存'"
+              )
+              assert page.locator("#litellm-zh-data-probe td").text_content() == "User"
+
+              zh_output = os.path.join(os.environ["RUNNER_TEMP"], "browser-smoke-zh.png")
+              page.screenshot(path=zh_output, full_page=True)
+
               page.locator("#litellm-zh-toggle").click()
               page.wait_for_function("document.documentElement.lang === 'en'")
               assert page.locator("html").get_attribute("lang") == "en"
+              page.wait_for_function(
+                  "document.getElementById('litellm-zh-runtime-probe')?.textContent === 'Save'"
+              )
+              assert page.locator("#litellm-zh-data-probe td").text_content() == "User"
               page.screenshot(path=output, full_page=True)
               browser.close()
           print("Chromium overlay smoke test passed")
@@ -131,7 +172,7 @@ jobs:
 
       - name: Upload compatibility report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: litellm-1.101.0-${{ runner.os }}-report
           if-no-files-found: ignore
@@ -142,3 +183,4 @@ jobs:
             ${{ runner.temp }}/strings.json
             ${{ runner.temp }}/litellm.log
             ${{ runner.temp }}/browser-smoke.png
+            ${{ runner.temp }}/browser-smoke-zh.png

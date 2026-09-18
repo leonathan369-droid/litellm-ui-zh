@@ -39,6 +39,7 @@ dist/litellm-zh.js
 - `pre/code`
 - `contenteditable`
 - 带 `data-litellm-zh-ignore` 的元素及子树
+- 普通表格数据单元格（`td`）中的文本和可翻译属性；单元格内明确的按钮/标签仍可翻译
 
 ## 安装器安全模型
 
@@ -67,3 +68,7 @@ staging    -> target
 - 当前 LiteLLM 是否存在 VERIFIED / AUTOMATED_VERIFIED 记录。
 
 “checksum 正常”不等于“当前 LiteLLM 已验证兼容”。
+
+## 静态候选英文门禁
+
+`scripts/collect_strings.py` 会扫描 LiteLLM 导出的 HTML 文本与可翻译属性。兼容性 CI 将结果与 `compatibility/static-unknown-allowlist.json` 对比；出现新的未翻译静态候选会直接失败，必须由维护者判断是新增翻译还是明确允许保留的品牌/标题。
