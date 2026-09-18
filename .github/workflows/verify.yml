@@ -16,11 +16,11 @@ jobs:
         python-version: ['3.11', '3.13']
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: ${{ matrix.python-version }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '20'
       - name: Validate locale JSON
@@ -30,7 +30,7 @@ jobs:
       - name: Run Python tests
         run: python3 -m unittest discover -s tests -v
       - name: Compile installer and builder
-        run: python3 -m py_compile scripts/install.py scripts/build_patch.py
+        run: python3 -m py_compile scripts/install.py scripts/build_patch.py scripts/check_upstream.py scripts/collect_strings.py
       - name: Check generated JavaScript
         run: node --check dist/litellm-zh.js
       - name: Run translation runtime tests
