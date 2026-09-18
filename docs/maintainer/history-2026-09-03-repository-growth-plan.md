@@ -1,3 +1,5 @@
+> Historical document from the v0.1.1 repository-growth work. Some commands and constraints are superseded by v0.2.0; use `docs/maintenance.md` for current procedures.
+
 # Repository Growth Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
