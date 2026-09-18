@@ -9,16 +9,29 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ['3.11', '3.13']
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: python3 -m unittest discover -s tests -v
-      - run: python3 -m py_compile scripts/install.py
-      - run: node --check patches/litellm-zh.js
-      - run: node --test tests/test_translation.js
+      - name: Validate locale JSON
+        run: python3 -m json.tool locales/zh-CN.json > /dev/null
+      - name: Verify generated overlay is reproducible
+        run: python3 scripts/build_patch.py --check
+      - name: Run Python tests
+        run: python3 -m unittest discover -s tests -v
+      - name: Compile installer and builder
+        run: python3 -m py_compile scripts/install.py scripts/build_patch.py
+      - name: Check generated JavaScript
+        run: node --check dist/litellm-zh.js
+      - name: Run translation runtime tests
+        run: node --test tests/test_translation.js
