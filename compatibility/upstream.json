@@ -1,6 +1,7 @@
 {
   "project": "BerriAI/litellm",
   "latest_verified": "1.99.0",
+  "latest_automated_verified": "1.101.0",
   "patch_version": "0.2.0",
   "verified": [
     {
@@ -9,7 +10,29 @@
         "macOS"
       ],
       "status": "verified",
-      "date": "2026-09-03"
+      "date": "2026-09-03",
+      "scope": [
+        "installer + check",
+        "manual browser UI check"
+      ]
+    },
+    {
+      "litellm": "1.101.0",
+      "os": [
+        "Ubuntu",
+        "macOS"
+      ],
+      "status": "automated-verified",
+      "date": "2026-09-18",
+      "scope": [
+        "exact package install",
+        "packaged UI discovery",
+        "overlay install/check/diagnose",
+        "LiteLLM process start",
+        "served UI injection",
+        "served overlay checksum",
+        "Chromium overlay smoke test on Linux"
+      ]
     }
   ]
 }

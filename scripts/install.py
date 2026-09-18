@@ -386,11 +386,14 @@ def compatibility_status(
     for record in records:
         if not isinstance(record, dict):
             continue
-        if (
-            record.get("status") == "verified"
-            and normalize_version(record.get("litellm")) == current
-        ):
+        if normalize_version(record.get("litellm")) != current:
+            continue
+        status = str(record.get("status") or "").replace("_", "-").lower()
+        if status == "verified":
             return "VERIFIED"
+        if status == "automated-verified":
+            return "AUTOMATED_VERIFIED"
+        return "UNVERIFIED"
     return "UNVERIFIED"
 
 
