@@ -18,7 +18,7 @@ import sys
 import uuid
 
 
-PATCH_VERSION = "0.1.1"
+PATCH_VERSION = "0.1.2"
 MARKER = 'src="/ui/assets/litellm-zh.js?v=3"'
 MANIFEST_NAME = ".litellm-ui-zh.json"
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]

@@ -1,15 +1,15 @@
-# LiteLLM WebUI 简体中文补丁 v0.1.1
+# LiteLLM WebUI 简体中文补丁 v0.1.2
 
 [![Verify](https://github.com/leonathan369-droid/litellm-ui-zh/actions/workflows/verify.yml/badge.svg)](https://github.com/leonathan369-droid/litellm-ui-zh/actions/workflows/verify.yml)
 [![Release](https://img.shields.io/github/v/release/leonathan369-droid/litellm-ui-zh)](https://github.com/leonathan369-droid/litellm-ui-zh/releases)
-[![Verified](https://img.shields.io/badge/Verified-LiteLLM%20v1.99.0%20%28macOS%29-2ea44f)](docs/compatibility.md)
+[![Verified](https://img.shields.io/badge/Verified-LiteLLM%20v1.101.0%20%28macOS%29-2ea44f)](docs/compatibility.md)
 
 为 [LiteLLM](https://github.com/BerriAI/litellm) Proxy WebUI 提供简体中文
 浏览器端翻译覆盖层。它复制 LiteLLM 自带的静态 UI 到单独目录后注入翻译脚本，并在
 右下角提供 `中 / EN` 切换。This is an unofficial Simplified Chinese overlay,
 not a LiteLLM fork.
 
-当前补丁版本为 `v0.1.1`；已验证适配 LiteLLM `v1.99.0`（macOS）。其他系统、浏览器
+当前补丁版本为 `v0.1.2`；已验证适配 LiteLLM `v1.101.0`（macOS）。其他系统、浏览器
 和 LiteLLM 版本尚未验证，详见[兼容性矩阵](#兼容性矩阵)。
 
 如果这个项目对你有帮助，欢迎点个 Star。有意见、翻译建议或版本兼容性问题，欢迎通过
@@ -92,6 +92,7 @@ python3 scripts/install.py restore --target "$HOME/.config/litellm/ui-zh"
 
 | LiteLLM | 系统 | 验证日期 | 安装器 | 浏览器界面 |
 | --- | --- | --- | --- | --- |
+| 1.101.0 | macOS | 2026-09-18 | installer + check passed | browser UI manually checked |
 | 1.99.0 | macOS | 2026-09-03 | installer + check passed | browser UI manually checked |
 
 尚未验证 Linux 或 Windows。升级 LiteLLM 前保留当前 UI 目录；升级后重新运行安装器或

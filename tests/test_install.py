@@ -39,7 +39,7 @@ class InstallTest(unittest.TestCase):
             self.run_installer("check", "--target", str(target))
 
             metadata = json.loads((target / ".litellm-ui-zh.json").read_text())
-            self.assertEqual(metadata["patch_version"], "0.1.1")
+            self.assertEqual(metadata["patch_version"], "0.1.2")
             self.assertEqual(metadata["html_files_injected"], 2)
             self.assertIn('litellm-zh.js?v=3', (target / "index.html").read_text())
             self.assertNotIn('litellm-zh.js?v=3', (source / "index.html").read_text())

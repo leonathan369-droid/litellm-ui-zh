@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2 - 2026-09-18
+
+- Verified the overlay and safe installer with LiteLLM 1.101.0 on macOS.
+- Confirmed the launch-agent-managed proxy and local launchpad health after upgrade.
+
 ## 0.1.1 - 2026-09-03
 
 - Added repository verification with GitHub Actions.
