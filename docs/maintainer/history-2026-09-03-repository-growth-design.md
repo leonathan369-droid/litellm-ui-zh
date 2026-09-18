@@ -1,3 +1,5 @@
+> Historical design document from v0.1.1. It is retained for project history; current architecture is documented in `docs/architecture.md`.
+
 # LiteLLM WebUI Chinese Patch Repository Growth Design
 
 ## Purpose
