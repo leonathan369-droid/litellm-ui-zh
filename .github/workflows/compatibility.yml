@@ -1,0 +1,96 @@
+name: LiteLLM Compatibility
+
+on:
+  push:
+    paths:
+      - '.github/workflows/compatibility.yml'
+      - 'scripts/**'
+      - 'src/**'
+      - 'locales/**'
+      - 'dist/**'
+      - 'compatibility/**'
+      - 'tests/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  litellm-1-101:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install exact LiteLLM release
+        run: python3 -m pip install --disable-pip-version-check "litellm[proxy]==1.101.0"
+      - name: Confirm LiteLLM version and packaged UI
+        run: |
+          python3 - <<'PY'
+          import importlib.metadata
+          import importlib.util
+          from pathlib import Path
+
+          version = importlib.metadata.version("litellm")
+          assert version == "1.101.0", version
+          spec = importlib.util.find_spec("litellm")
+          assert spec and spec.origin
+          ui = Path(spec.origin).resolve().parent / "proxy" / "_experimental" / "out"
+          assert (ui / "index.html").is_file(), ui
+          assert (ui / "_next").is_dir(), ui
+          print(f"LiteLLM={version}")
+          print(f"Packaged UI={ui}")
+          print(f"HTML routes={len(list(ui.rglob('*.html')))}")
+          PY
+      - name: Install overlay against real LiteLLM UI
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="$RUNNER_TEMP/litellm-ui-zh"
+          python3 scripts/install.py install --target "$target"
+          python3 scripts/install.py check --target "$target" | tee "$RUNNER_TEMP/check.txt"
+          python3 scripts/install.py diagnose --target "$target" | tee "$RUNNER_TEMP/diagnose.txt"
+          grep -q "compatibility:      MATCH" "$RUNNER_TEMP/check.txt"
+          grep -q "patch_checksum=OK" "$RUNNER_TEMP/diagnose.txt"
+          python3 scripts/collect_strings.py "$target" --json > "$RUNNER_TEMP/strings.json"
+          python3 - "$RUNNER_TEMP/strings.json" <<'PY'
+          import json
+          import sys
+          data = json.load(open(sys.argv[1], encoding="utf-8"))
+          print(json.dumps({
+              "candidate_count": data["candidate_count"],
+              "unknown_count": data["unknown_count"],
+          }))
+          PY
+      - name: Serve the patched UI through LiteLLM
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="$RUNNER_TEMP/litellm-ui-zh"
+          export LITELLM_UI_PATH="$target"
+          litellm --host 127.0.0.1 --port 4000 > "$RUNNER_TEMP/litellm.log" 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+
+          ok=0
+          for attempt in $(seq 1 30); do
+            if curl -fsSL "http://127.0.0.1:4000/ui/" -o "$RUNNER_TEMP/ui.html"; then
+              ok=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ok" -ne 1 ]; then
+            cat "$RUNNER_TEMP/litellm.log"
+            exit 1
+          fi
+
+          grep -q 'litellm-zh.js?v=' "$RUNNER_TEMP/ui.html"
+          curl -fsSL "http://127.0.0.1:4000/ui/assets/litellm-zh.js" -o "$RUNNER_TEMP/served-overlay.js"
+          cmp "$RUNNER_TEMP/served-overlay.js" "$target/assets/litellm-zh.js"
+          echo "Patched UI served successfully through LiteLLM"
