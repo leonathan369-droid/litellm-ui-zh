@@ -26,6 +26,7 @@ MANIFEST_NAME = ".litellm-ui-zh.json"
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 PATCH_SOURCE = REPOSITORY_ROOT / "dist" / "litellm-zh.js"
 PATCH_ASSET_NAME = "litellm-zh.js"
+COMPATIBILITY_STATE = REPOSITORY_ROOT / "compatibility" / "upstream.json"
 
 
 def fail(message: str) -> None:
@@ -341,18 +342,64 @@ def upgrade(args: argparse.Namespace) -> None:
     print(f"HTML routes: {metadata['html_files_injected']}/{metadata['html_files_total']}")
 
 
-def compatibility_status(metadata: dict[str, object], installed_version: str | None) -> str:
-    manifest_version = metadata.get("litellm_version")
-    if not installed_version or not manifest_version:
+def normalize_version(value: object) -> str:
+    return str(value or "").strip().lstrip("v")
+
+
+def source_version_status(
+    metadata: dict[str, object],
+    installed_version: str | None,
+) -> str:
+    manifest_version = normalize_version(metadata.get("litellm_version"))
+    current_version = normalize_version(installed_version)
+    if not manifest_version or not current_version:
         return "UNKNOWN"
-    return "MATCH" if installed_version == manifest_version else "UNVERIFIED"
+    return "MATCH" if manifest_version == current_version else "CHANGED"
+
+
+def load_compatibility_state() -> dict[str, object] | None:
+    if not COMPATIBILITY_STATE.is_file():
+        return None
+    try:
+        state = json.loads(COMPATIBILITY_STATE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return state if isinstance(state, dict) else None
+
+
+def compatibility_status(
+    installed_version: str | None,
+    state: dict[str, object] | None = None,
+) -> str:
+    current = normalize_version(installed_version)
+    if not current:
+        return "UNKNOWN"
+
+    state = state if state is not None else load_compatibility_state()
+    if not state:
+        return "UNKNOWN"
+
+    records = state.get("verified")
+    if not isinstance(records, list):
+        return "UNKNOWN"
+
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        if (
+            record.get("status") == "verified"
+            and normalize_version(record.get("litellm")) == current
+        ):
+            return "VERIFIED"
+    return "UNVERIFIED"
 
 
 def check(args: argparse.Namespace) -> None:
     target = Path(args.target).expanduser().resolve()
     metadata, warnings, files = verify_target(target, repository_check=True)
     installed_version = resolve_litellm_version(args.python, required=False)
-    status = compatibility_status(metadata, installed_version)
+    source_status = source_version_status(metadata, installed_version)
+    status = compatibility_status(installed_version)
 
     print("litellm-ui-zh check")
     print(f"patch installed:   {metadata.get('patch_version')}")
@@ -361,6 +408,7 @@ def check(args: argparse.Namespace) -> None:
     print(f"HTML injection:    {len(files)}/{len(files)}")
     print(f"LiteLLM manifest:  {metadata.get('litellm_version') or 'unknown'}")
     print(f"LiteLLM installed: {installed_version or 'unknown'}")
+    print(f"source version:     {source_status}")
     print(f"compatibility:      {status}")
     for warning in warnings:
         print(f"warning: {warning}")
@@ -381,7 +429,8 @@ def diagnose(args: argparse.Namespace) -> None:
     print(f"manifest_schema={metadata.get('schema_version')}")
     print(f"patch_checksum=OK")
     print(f"html_routes={len(files)}")
-    print(f"compatibility={compatibility_status(metadata, installed_version)}")
+    print(f"source_version={source_version_status(metadata, installed_version)}")
+    print(f"compatibility={compatibility_status(installed_version)}")
     for warning in warnings:
         print(f"warning={warning}")
 
