@@ -100,7 +100,7 @@ function createEnvironment(children = []) {
   };
 
   const source = fs.readFileSync(
-    path.join(__dirname, "..", "patches", "litellm-zh.js"),
+    path.join(__dirname, "..", "dist", "litellm-zh.js"),
     "utf8",
   );
 
