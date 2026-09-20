@@ -56,7 +56,7 @@ jobs:
 
       - name: Install exact LiteLLM and Playwright
         run: |
-          python3 -m pip install --disable-pip-version-check "litellm[proxy]==1.101.0" "playwright==1.55.0"
+          python3 -m pip install --disable-pip-version-check "litellm[proxy]==1.101.0" "prisma==0.11.0" "playwright==1.55.0"
           python3 -m playwright install --with-deps chromium
 
       - name: Initialize temporary LiteLLM database
