@@ -27,6 +27,17 @@ class UpstreamWatchTest(unittest.TestCase):
         self.assertTrue(status["update_available"])
         self.assertEqual(status["latest"], "1.101.0")
 
+    def test_automated_reviewed_release_is_not_rediscovered(self) -> None:
+        state = {
+            "project": "BerriAI/litellm",
+            "latest_verified": "1.99.0",
+            "latest_automated_verified": "1.101.0",
+        }
+        release = {"tag_name": "v1.101.0"}
+        status = watch.evaluate(state, release)
+        self.assertFalse(status["update_available"])
+        self.assertEqual(status["tracked"], "1.101.0")
+
     def test_equal_release_is_not_an_update(self) -> None:
         state = {"project": "BerriAI/litellm", "latest_verified": "1.101.0"}
         release = {"tag_name": "v1.101.0"}

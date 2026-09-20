@@ -25,7 +25,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           LATEST: ${{ steps.upstream.outputs.latest }}
-          VERIFIED: ${{ steps.upstream.outputs.verified }}
+          TRACKED: ${{ steps.upstream.outputs.tracked }}
           RELEASE_URL: ${{ steps.upstream.outputs.release_url }}
         run: |
           set -euo pipefail
@@ -39,7 +39,7 @@ jobs:
           A newer stable LiteLLM release is available.
 
           - Latest stable: `v${LATEST}`
-          - Latest verified here: `v${VERIFIED}`
+          - Latest compatibility-reviewed here: `v${TRACKED}`
           - Upstream release: ${RELEASE_URL}
 
           Maintenance checklist:

@@ -42,14 +42,18 @@ def load_latest_release(url: str = LATEST_RELEASE_API) -> dict[str, object]:
 def evaluate(state: dict[str, object], release: dict[str, object]) -> dict[str, object]:
     latest = normalize_version(str(release.get("tag_name") or ""))
     verified = normalize_version(str(state.get("latest_verified") or ""))
-    if not latest or not verified:
+    automated = normalize_version(str(state.get("latest_automated_verified") or ""))
+    tracked_versions = [value for value in (verified, automated) if value]
+    if not latest or not tracked_versions:
         raise ValueError("state and release must contain versions")
+    tracked = max(tracked_versions, key=version_key)
 
-    update_available = version_key(latest) > version_key(verified)
+    update_available = version_key(latest) > version_key(tracked)
     return {
         "project": state.get("project"),
         "latest": latest,
         "verified": verified,
+        "tracked": tracked,
         "update_available": update_available,
         "release_url": release.get("html_url") or "",
         "release_name": release.get("name") or release.get("tag_name") or "",
@@ -60,6 +64,7 @@ def write_github_output(path: Path, status: dict[str, object]) -> None:
     values = {
         "latest": status["latest"],
         "verified": status["verified"],
+        "tracked": status["tracked"],
         "update_available": str(bool(status["update_available"])).lower(),
         "release_url": status["release_url"],
     }
