@@ -29,7 +29,13 @@
     var current = element;
     while (current) {
       if (DATA_CELL_CONTROL_TAGS.test(current.tagName || "")) return false;
-      if ((current.tagName || "") === "TD") return true;
+      if ((current.tagName || "") === "TD") {
+        // DataTable empty states are rendered in a spanning cell. Those strings
+        // are UI chrome, not row data, so allow them through exact-match
+        // translation while keeping ordinary cells protected.
+        if (current.hasAttribute && current.hasAttribute("colspan")) return false;
+        return true;
+      }
       current = current.parentElement;
     }
     return false;

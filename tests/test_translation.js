@@ -174,6 +174,37 @@ test("translates exact UI labels without translating table data or matching subs
 });
 
 
+test("translates DataTable empty-state UI inside colspan cells while protecting ordinary data cells", () => {
+  const table = new Element("table");
+  const row = new Element("tr");
+
+  const dataCell = new Element("td");
+  const dataText = new TextNode("User");
+  dataCell.appendChild(dataText);
+  row.appendChild(dataCell);
+
+  const emptyRow = new Element("tr");
+  const emptyCell = new Element("td");
+  emptyCell.setAttribute("colspan", "6");
+  const emptyText = new TextNode("No keys found");
+  emptyCell.appendChild(emptyText);
+  emptyRow.appendChild(emptyCell);
+
+  table.appendChild(row);
+  table.appendChild(emptyRow);
+
+  const env = createEnvironment([table]);
+
+  assert.equal(dataText.nodeValue, "User");
+  assert.equal(emptyText.nodeValue, "未找到密钥");
+
+  env.toggle.click();
+  assert.equal(dataText.nodeValue, "User");
+  assert.equal(emptyText.nodeValue, "No keys found");
+});
+
+
+
 test("tracks upstream characterData changes instead of restoring stale first-seen text", () => {
   const status = new TextNode("Loading...");
   const env = createEnvironment([status]);
