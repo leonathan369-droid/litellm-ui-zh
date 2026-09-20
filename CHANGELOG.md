@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 - Unreleased
+## 0.2.0 - 2026-09-20
 
 - Reworked translation matching to avoid generic substring replacement of user-visible data.
 - Added WeakMap-backed text and attribute state for React-driven updates and reliable language restoration.
@@ -12,6 +12,9 @@
 - Expanded verification CI to Ubuntu and macOS on Python 3.11 and 3.13.
 - Added upstream stable-release monitoring, untranslated HTML candidate collection, and an allowlist-gated static-string compatibility check.
 - Added real-package LiteLLM v1.101.0 compatibility CI on Ubuntu and macOS, including process startup, served UI verification, and Linux Chromium smoke testing of dynamic translation, language restoration, and table-data protection.
+- Added PostgreSQL-backed authenticated Admin UI review on Linux with 15 core routes, screenshots, and regression checks for translated placeholders.
+- Fixed audited login, search, and Playground placeholder gaps found during manual screenshot review.
+- Changed upstream release discovery to compare against the highest compatibility-reviewed version, preventing duplicate alerts for already reviewed releases.
 - Updated the Simplified Chinese dictionary for LiteLLM v1.101.0 Auto-Router, Agent/Skill Hub, Guardrail detail, login, and related UI changes.
 - Distinguished `VERIFIED` from `AUTOMATED_VERIFIED`.
 - Pinned first-party GitHub Actions to immutable commit SHAs.

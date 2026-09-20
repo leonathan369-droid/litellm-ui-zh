@@ -2,7 +2,7 @@
 
 ## 1. 发现新 stable release
 
-`upstream-watch.yml` 每天检查 BerriAI/litellm 最新 stable release。发现高于 `compatibility/upstream.json.latest_verified` 的版本时创建兼容性 Issue。自动化只负责发现任务，不自动标记兼容或发布。
+`upstream-watch.yml` 每天检查 BerriAI/litellm 最新 stable release。它以 `latest_verified` 与 `latest_automated_verified` 中已审查到的最高版本作为发现基线，只有出现更高 stable 版本才创建兼容性 Issue。自动化只负责发现任务，不自动标记兼容或发布。
 
 ## 2. 建兼容分支
 
@@ -35,7 +35,7 @@ python3 scripts/install.py diagnose --target /path/to/test-ui
 python3 scripts/collect_strings.py /path/to/test-ui --json
 ```
 
-`compatibility.yml` 还会在 Ubuntu/macOS 安装精确 LiteLLM、定位真实 packaged UI、启动 LiteLLM、确认 `/ui/` 已注入 Overlay，并校验实际服务出来的 JS 与安装目录一致。Linux runner 额外执行 Chromium smoke test，验证 Overlay 加载和中/EN 切换。
+`compatibility.yml` 还会在 Ubuntu/macOS 安装精确 LiteLLM、定位真实 packaged UI、启动 LiteLLM、确认 `/ui/` 已注入 Overlay，并校验实际服务出来的 JS 与安装目录一致。Linux runner 额外执行 Chromium smoke test，验证 Overlay 加载和中/EN 切换。`admin-ui-route-review.yml` 使用 PostgreSQL + Prisma 启动真实 Admin UI 会话，登录后逐页检查核心路由、关键中文 placeholder，并保存截图供人工复核。
 
 ## 5. 翻译维护
 

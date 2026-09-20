@@ -6,7 +6,7 @@
 
 这是一个独立的 LiteLLM Proxy WebUI 简体中文浏览器端 Overlay。它复制 LiteLLM 自带静态 UI 到独立目录，再注入翻译脚本；不修改 LiteLLM Python 包、API、模型路由、数据库、密钥或计费逻辑。
 
-当前开发线为 **v0.2.0**。LiteLLM **v1.99.0 / macOS** 已完成人工浏览器验证；LiteLLM **v1.101.0 / Ubuntu + macOS** 已完成真实包安装、启动、UI 注入和浏览器级 smoke test 的自动化验证，但尚未提升为“人工逐页验证”。完整状态见 [兼容性记录](docs/compatibility.md)。
+当前发布版本为 **v0.2.0**。LiteLLM **v1.101.0 / Ubuntu + macOS** 已完成精确包安装、启动、UI 注入和浏览器级自动化验证；其中 Ubuntu 还完成了 PostgreSQL 支撑的真实 Admin UI 登录、15 个核心管理路由检查与人工截图复核。为避免把 Ubuntu 的人工结果夸大到 macOS，版本级 `check` 状态仍保守记录为 `AUTOMATED_VERIFIED`。LiteLLM **v1.99.0 / macOS** 保留历史 `VERIFIED` 记录。完整范围见 [兼容性记录](docs/compatibility.md)。
 
 ## 快速安装
 

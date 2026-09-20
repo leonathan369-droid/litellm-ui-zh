@@ -23,7 +23,7 @@
         "macOS"
       ],
       "status": "automated-verified",
-      "date": "2026-09-18",
+      "date": "2026-09-20",
       "scope": [
         "exact package install",
         "packaged UI discovery",
@@ -31,7 +31,11 @@
         "LiteLLM process start",
         "served UI injection",
         "served overlay checksum",
-        "Chromium overlay smoke test on Linux"
+        "Chromium overlay smoke test on Linux",
+        "PostgreSQL-backed authenticated Admin UI route review on Linux",
+        "15 core Admin UI routes checked on Linux",
+        "manual screenshot review on Linux",
+        "translated placeholder regression assertions on audited routes"
       ]
     }
   ]
