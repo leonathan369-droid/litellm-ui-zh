@@ -1,0 +1,58 @@
+name: Publish v0.2.0
+
+on:
+  push:
+    branches:
+      - refactor/v0.2-maintenance
+    paths:
+      - '.github/workflows/publish-v0.2.0.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish v0.2.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if gh release view v0.2.0 --repo "$REPO" >/dev/null 2>&1; then
+            echo "v0.2.0 already exists"
+            exit 0
+          fi
+          cat > "$RUNNER_TEMP/release-notes.md" <<'EOF'
+          ## v0.2.0
+
+          This release hardens the LiteLLM WebUI Simplified Chinese Overlay for safer translation, upgrades, and compatibility maintenance.
+
+          ### Highlights
+          - Exact-match translation engine with WeakMap-backed dynamic DOM state.
+          - Protection for code, editable content, table/user data, and explicitly ignored regions.
+          - 711 Simplified Chinese UI translations, including audited LiteLLM 1.101.0 login, search, Playground, Agent/Skill, Guardrail, and settings UI.
+          - Reproducible locale/runtime build with `locales/zh-CN.json`, `src/overlay.js`, and `dist/litellm-zh.js`.
+          - Installer 2.0 with safe `install`, `upgrade`, `check`, `restore`, and `diagnose`, plus Manifest v2, backups, and rollback protection.
+          - Ubuntu/macOS × Python 3.11/3.13 CI, upstream stable-release monitoring, and static untranslated-string gating.
+          - Exact-package LiteLLM 1.101.0 compatibility checks on Ubuntu and macOS.
+          - PostgreSQL-backed authenticated Admin UI validation on Ubuntu with real login, 15 core routes, translated-placeholder assertions, and manually reviewed screenshots.
+
+          ### Compatibility note
+          LiteLLM 1.101.0 remains conservatively recorded as `AUTOMATED_VERIFIED` at the version level because Ubuntu received the full route-by-route manual screenshot review while macOS received the real-package automated compatibility scope. Historical LiteLLM 1.99.0 / macOS remains `VERIFIED`.
+
+          ### Upgrade
+          After updating this repository, run:
+
+          ```bash
+          python3 scripts/install.py upgrade --target "$HOME/.config/litellm/ui-zh"
+          python3 scripts/install.py check --target "$HOME/.config/litellm/ui-zh"
+          ```
+
+          See `CHANGELOG.md` and `docs/compatibility.md` for the complete scope.
+          EOF
+          gh release create v0.2.0 --repo "$REPO" \
+            --target 81fd85a51cc2ec6e0155d69f7f595e43836c9ef5 \
+            --title "v0.2.0" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"
