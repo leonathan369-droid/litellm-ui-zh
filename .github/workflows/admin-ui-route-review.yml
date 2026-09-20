@@ -1,0 +1,120 @@
+name: Admin UI Route Review
+
+on:
+  push:
+    paths:
+      - '.github/workflows/admin-ui-route-review.yml'
+      - 'scripts/**'
+      - 'src/**'
+      - 'locales/**'
+      - 'dist/**'
+      - 'compatibility/**'
+      - 'tests/admin_ui_route_review.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    name: LiteLLM 1.101 authenticated routes
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16.6
+        env:
+          POSTGRES_USER: litellm
+          POSTGRES_DB: litellm
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U litellm"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://litellm@127.0.0.1:5432/litellm
+      UI_USERNAME: admin
+      LITELLM_LOCAL_MODEL_COST_MAP: "True"
+      DISABLE_SCHEMA_UPDATE: "true"
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+
+      - name: Generate ephemeral UI credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          value="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+          echo "::add-mask::$value"
+          echo "UI_PASSWORD=$value" >> "$GITHUB_ENV"
+          echo "LITELLM_MASTER_KEY=$value" >> "$GITHUB_ENV"
+
+      - name: Install exact LiteLLM and Playwright
+        run: |
+          python3 -m pip install --disable-pip-version-check "litellm[proxy]==1.101.0" "playwright==1.55.0"
+          python3 -m playwright install --with-deps chromium
+
+      - name: Initialize temporary LiteLLM database
+        shell: bash
+        run: |
+          set -euo pipefail
+          schema="$(python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          spec = importlib.util.find_spec("litellm")
+          assert spec and spec.origin
+          schema = Path(spec.origin).resolve().parent / "proxy" / "schema.prisma"
+          assert schema.is_file(), schema
+          print(schema)
+          PY
+          )"
+          echo "Using Prisma schema: $schema"
+          python3 -m prisma generate --schema "$schema"
+          python3 -m prisma db push --schema "$schema" --accept-data-loss
+
+      - name: Install overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="$RUNNER_TEMP/litellm-ui-zh-auth"
+          python3 scripts/install.py install --target "$target"
+          echo "LITELLM_UI_PATH=$target" >> "$GITHUB_ENV"
+
+      - name: Start LiteLLM and review authenticated routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          litellm --host 127.0.0.1 --port 4000 > "$RUNNER_TEMP/litellm-auth.log" 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+
+          ready=0
+          for attempt in $(seq 1 90); do
+            if curl -fsS -H "Authorization: Bearer $LITELLM_MASTER_KEY"               "http://127.0.0.1:4000/health" > /dev/null; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            tail -n 200 "$RUNNER_TEMP/litellm-auth.log"
+            exit 1
+          fi
+
+          python3 tests/admin_ui_route_review.py
+
+      - name: Upload route review artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: litellm-1.101.0-authenticated-admin-routes
+          if-no-files-found: ignore
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/admin-routes
+            ${{ runner.temp }}/litellm-auth.log
