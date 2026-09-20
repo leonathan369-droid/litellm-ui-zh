@@ -1,45 +1,41 @@
-# LiteLLM 版本兼容性记录：补丁 v0.1.2
+# LiteLLM 兼容性记录
 
-本页记录可复现的 LiteLLM WebUI 中文覆盖层验证结果，方便安装前判断风险。它不是
-LiteLLM 官方兼容性承诺；未列出的系统、浏览器或版本均视为尚未验证。
+本页区分“人工验证”和“真实环境自动化验证”，避免把“安装成功”误写成“所有平台、所有页面都已人工确认”。
 
-当前补丁版本为 `v0.1.2`；已验证适配 LiteLLM `v1.101.0`（macOS）。
+## 状态定义
 
-## 状态说明
+- **VERIFIED**：维护者在对应系统上完成安装、完整性检查，并按定义范围进行人工浏览器确认。
+- **AUTOMATED_VERIFIED**：真实 LiteLLM 精确版本完成安装、启动、Overlay 注入与浏览器级自动化验证；若不同系统的人工覆盖不一致，版本级状态保持保守。
+- **UNVERIFIED**：尚无足够证据确认当前版本。
+- **UNKNOWN**：无法取得可靠版本或状态数据。
 
-- `已验证`：维护者按本仓库安装、校验并在真实浏览器中检查过。
-- `社区反馈`：由用户按完整模板报告，等待维护者复核。
-- `排查中`：已有可复现问题，尚未确认根因或修复方案。
-- `不兼容`：已确认当前版本无法正常使用，并附有可复现依据。
+## 当前记录
 
-## 已验证记录
-
-| LiteLLM 版本 | 系统 | 验证日期 | 状态 | 验证范围 |
+| LiteLLM | 系统 | 日期 | 状态 | 范围 |
 | --- | --- | --- | --- | --- |
-| 1.101.0 | macOS | 2026-09-18 | 已验证 | 安装器完成 51 个 HTML 路由注入；`check` 通过；启动台重启后健康检查为 200，真实浏览器加载中文覆盖层并检查登录页。 |
-| 1.99.0 | macOS | 2026-09-03 | 已验证 | 安装器完成 51 个 HTML 路由注入；`check` 通过；真实浏览器加载中文覆盖层并手动检查常用管理界面。 |
+| 1.99.0 | macOS | 2026-09-03 | VERIFIED | 安装器、check、真实浏览器常用管理界面人工检查 |
+| 1.101.0 | Ubuntu | 2026-09-20 | 人工路由复核完成；版本级状态保持 AUTOMATED_VERIFIED | 精确包安装、PostgreSQL/Prisma 初始化、真实 Admin UI 登录、15 个核心管理路由、关键 placeholder 回归断言、全页截图人工复核 |
+| 1.101.0 | macOS | 2026-09-20 | AUTOMATED_VERIFIED | 精确包安装、packaged UI 定位、overlay install/check/diagnose、LiteLLM 启动、/ui/ 注入与 served overlay checksum |
 
-## 升级前自测
+LiteLLM 1.101.0 的版本级状态仍记为 **AUTOMATED_VERIFIED**，原因是当前逐页人工视觉复核是在 Ubuntu/Linux Chromium 环境完成的；macOS 已通过真实包兼容自动化，但没有宣称完成同等范围的逐页人工检查。这样 `check` 不会把某一平台的人工结果误报成所有平台均 VERIFIED。
 
-升级 LiteLLM 后，先在单独的自定义 UI 目录重新安装并运行校验：
+## 新版本验证流程
 
-```zsh
-python3 scripts/install.py install \
-  --target "$HOME/.config/litellm/ui-zh"
-python3 scripts/install.py check \
-  --target "$HOME/.config/litellm/ui-zh"
+1. 等待 LiteLLM stable release；RC/dev/nightly 不作为兼容发布目标。
+2. 创建兼容分支并安装精确版本。
+3. 运行 `install.py upgrade/check/diagnose`。
+4. 运行 `scripts/collect_strings.py` 收集静态 HTML 新候选英文。
+5. 运行完整 CI、真实 LiteLLM compatibility workflow 与数据库支持的 Admin UI route review。
+6. 人工检查核心路由：Virtual Keys、Models + Endpoints、Playground、Usage、Agents、Skills、MCP Servers、Guardrails、Policies、Teams、Internal Users、Budgets、Logs、Router Settings、Admin Settings。
+7. 无法进入或依赖 Enterprise/外部 Provider 的页面必须标记 NOT TESTED，而不是 VERIFIED。
+8. 更新 `compatibility/upstream.json` 与本页后才能发布兼容声明。
+
+## 本地自测
+
+```bash
+python3 scripts/install.py upgrade --target "$HOME/.config/litellm/ui-zh"
+python3 scripts/install.py check --target "$HOME/.config/litellm/ui-zh"
+python3 scripts/install.py diagnose --target "$HOME/.config/litellm/ui-zh"
 ```
 
-随后让服务使用该目录并检查你实际会使用的 WebUI 路由。生产环境先在测试实例验证；
-若需回退，移除 `LITELLM_UI_PATH` 后重启 LiteLLM，或使用 `restore` 恢复自定义目录。
-
-## 提交兼容性反馈
-
-升级成功、翻译异常或页面无法加载，都欢迎提交
-[版本兼容性报告](https://github.com/leonathan369-droid/litellm-ui-zh/issues/new?template=compatibility.yml)。
-报告请包含：原版本与目标版本、系统、浏览器、受影响路由、最短复现步骤，以及已脱敏的
-诊断信息。
-
-不要提交 API Key、`MASTER_KEY`、密码、Cookie、数据库 URL、完整配置、请求内容或未
-脱敏日志。LiteLLM Proxy、Provider、数据库和上游 WebUI 的非翻译问题请提交至
-[LiteLLM 上游 Issue](https://github.com/BerriAI/litellm/issues)。
+提交兼容性 Issue 时不要包含 API Key、MASTER_KEY、Cookie、数据库 URL、完整配置、请求内容或未脱敏日志。

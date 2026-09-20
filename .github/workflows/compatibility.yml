@@ -1,0 +1,187 @@
+name: LiteLLM Compatibility
+
+on:
+  push:
+    paths:
+      - '.github/workflows/compatibility.yml'
+      - 'scripts/**'
+      - 'src/**'
+      - 'locales/**'
+      - 'dist/**'
+      - 'compatibility/**'
+      - 'tests/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  litellm-1-101:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+
+      - name: Install exact LiteLLM release
+        run: python3 -m pip install --disable-pip-version-check "litellm[proxy]==1.101.0"
+
+      - name: Confirm LiteLLM version and packaged UI
+        run: |
+          python3 - <<'PY'
+          import importlib.metadata
+          import importlib.util
+          from pathlib import Path
+
+          version = importlib.metadata.version("litellm")
+          assert version == "1.101.0", version
+          spec = importlib.util.find_spec("litellm")
+          assert spec and spec.origin
+          ui = Path(spec.origin).resolve().parent / "proxy" / "_experimental" / "out"
+          assert (ui / "index.html").is_file(), ui
+          assert (ui / "_next").is_dir(), ui
+          print(f"LiteLLM={version}")
+          print(f"Packaged UI={ui}")
+          print(f"HTML routes={len(list(ui.rglob('*.html')))}")
+          PY
+
+      - name: Install overlay against real LiteLLM UI
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="$RUNNER_TEMP/litellm-ui-zh"
+          python3 scripts/install.py install --target "$target"
+          python3 scripts/install.py check --target "$target" | tee "$RUNNER_TEMP/check.txt"
+          python3 scripts/install.py diagnose --target "$target" | tee "$RUNNER_TEMP/diagnose.txt"
+          grep -q "source version:     MATCH" "$RUNNER_TEMP/check.txt"
+          grep -q "patch_checksum=OK" "$RUNNER_TEMP/diagnose.txt"
+          python3 scripts/collect_strings.py "$target" --json > "$RUNNER_TEMP/strings.json"
+          python3 - "$RUNNER_TEMP/strings.json" compatibility/static-unknown-allowlist.json <<'PY'
+          import json
+          import sys
+
+          data = json.load(open(sys.argv[1], encoding="utf-8"))
+          allowlist = json.load(open(sys.argv[2], encoding="utf-8"))
+          allowed = set(allowlist.get("allowed", []))
+          unexpected = sorted(set(data["unknown"]) - allowed)
+          missing_expected = sorted(allowed - set(data["unknown"]))
+          summary = {
+              "candidate_count": data["candidate_count"],
+              "unknown_count": data["unknown_count"],
+              "allowed_unknown_count": len(set(data["unknown"]) & allowed),
+              "unexpected_unknown": unexpected,
+              "allowlist_entries_not_observed": missing_expected,
+          }
+          print(json.dumps(summary, ensure_ascii=False))
+          if unexpected:
+              raise SystemExit("unexpected untranslated static HTML candidates found")
+          PY
+
+      - name: Install Chromium smoke-test runtime
+        if: runner.os == 'Linux'
+        run: |
+          python3 -m pip install --disable-pip-version-check "playwright==1.55.0"
+          python3 -m playwright install --with-deps chromium
+
+      - name: Serve and smoke-test the patched UI through LiteLLM
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="$RUNNER_TEMP/litellm-ui-zh"
+          export LITELLM_UI_PATH="$target"
+          litellm --host 127.0.0.1 --port 4000 > "$RUNNER_TEMP/litellm.log" 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+
+          ok=0
+          for attempt in $(seq 1 45); do
+            if curl -fsSL "http://127.0.0.1:4000/ui/" -o "$RUNNER_TEMP/ui.html"; then
+              ok=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ok" -ne 1 ]; then
+            cat "$RUNNER_TEMP/litellm.log"
+            exit 1
+          fi
+
+          grep -q 'litellm-zh.js?v=' "$RUNNER_TEMP/ui.html"
+          curl -fsSL "http://127.0.0.1:4000/ui/assets/litellm-zh.js" -o "$RUNNER_TEMP/served-overlay.js"
+          cmp "$RUNNER_TEMP/served-overlay.js" "$target/assets/litellm-zh.js"
+
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            python3 - <<'PY'
+          import os
+          from playwright.sync_api import sync_playwright
+
+          output = os.path.join(os.environ["RUNNER_TEMP"], "browser-smoke.png")
+          with sync_playwright() as playwright:
+              browser = playwright.chromium.launch()
+              page = browser.new_page()
+              page.goto("http://127.0.0.1:4000/ui/", wait_until="domcontentloaded", timeout=45000)
+              page.wait_for_selector("#litellm-zh-toggle", timeout=30000)
+              assert page.locator("html").get_attribute("lang") == "zh-CN"
+
+              # Exercise the live MutationObserver against dynamically added UI
+              # and verify exact-match protection for table data in a real browser.
+              page.evaluate("""
+              () => {
+                const button = document.createElement("button");
+                button.id = "litellm-zh-runtime-probe";
+                button.textContent = "Save";
+                document.body.appendChild(button);
+
+                const table = document.createElement("table");
+                table.id = "litellm-zh-data-probe";
+                const row = document.createElement("tr");
+                const cell = document.createElement("td");
+                cell.textContent = "User";
+                row.appendChild(cell);
+                table.appendChild(row);
+                document.body.appendChild(table);
+              }
+              """)
+              page.wait_for_function(
+                  "document.getElementById('litellm-zh-runtime-probe')?.textContent === '保存'"
+              )
+              assert page.locator("#litellm-zh-data-probe td").text_content() == "User"
+
+              zh_output = os.path.join(os.environ["RUNNER_TEMP"], "browser-smoke-zh.png")
+              page.screenshot(path=zh_output, full_page=True)
+
+              page.locator("#litellm-zh-toggle").click()
+              page.wait_for_function("document.documentElement.lang === 'en'")
+              assert page.locator("html").get_attribute("lang") == "en"
+              page.wait_for_function(
+                  "document.getElementById('litellm-zh-runtime-probe')?.textContent === 'Save'"
+              )
+              assert page.locator("#litellm-zh-data-probe td").text_content() == "User"
+              page.screenshot(path=output, full_page=True)
+
+              browser.close()
+          print("Chromium overlay smoke test passed")
+          PY
+          fi
+
+          echo "Patched UI served successfully through LiteLLM"
+
+      - name: Upload compatibility report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: litellm-1.101.0-${{ runner.os }}-report
+          if-no-files-found: ignore
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/check.txt
+            ${{ runner.temp }}/diagnose.txt
+            ${{ runner.temp }}/strings.json
+            ${{ runner.temp }}/litellm.log
+            ${{ runner.temp }}/browser-smoke.png
+            ${{ runner.temp }}/browser-smoke-zh.png

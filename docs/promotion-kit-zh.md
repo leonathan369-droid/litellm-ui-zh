@@ -1,9 +1,8 @@
-# LiteLLM WebUI 简体中文补丁 v0.1.2：发布文案包
+# LiteLLM WebUI 简体中文补丁 v0.2.0：发布文案包
 
 本文件用于人工发布前审核。三版文案均只基于仓库已验证事实：本项目是非官方浏览器端
-简体中文覆盖层；不修改 LiteLLM Python 安装包。当前补丁发布版本为 `v0.1.2`，已在
-macOS 的 LiteLLM `v1.101.0` 上完成安装、`check` 和真实浏览器界面检查。未列出的系统、
-浏览器和 LiteLLM 版本均不作兼容性承诺。
+简体中文覆盖层；不修改 LiteLLM Python 安装包。当前补丁发布版本为 `v0.2.0`，已在
+LiteLLM `v1.101.0` 上完成 Ubuntu/macOS 精确包兼容验证；Ubuntu 还完成 PostgreSQL 支撑的真实登录与 15 个核心 Admin UI 路由人工截图复核。macOS 不宣称同等范围的逐页人工验证。
 
 发布时使用仓库中的脱敏预览图 `docs/assets/litellm-ui-zh-preview.png`。不得附带终端
 历史、环境变量、管理后台数据、密钥、请求、用量、日志或未脱敏截图。
@@ -19,7 +18,7 @@ macOS 的 LiteLLM `v1.101.0` 上完成安装、`check` 和真实浏览器界面�
 给自部署 LiteLLM 的中文用户做了一个非官方 WebUI 简体中文覆盖层：
 https://github.com/leonathan369-droid/litellm-ui-zh
 
-版本信息：补丁 `v0.1.2`；已验证 LiteLLM `v1.101.0`（macOS）。
+版本信息：补丁 `v0.2.0`；已兼容审查 LiteLLM `v1.101.0`（Ubuntu + macOS；平台人工覆盖范围见兼容性记录）。
 
 它不会修改 LiteLLM 的 Python 安装包。安装器会复制原始静态 UI 到独立目录、注入翻译
 脚本，并提供 `check` 校验和 `restore` 回退；Proxy API、模型路由、数据库、密钥和计费
@@ -34,8 +33,7 @@ python3 scripts/install.py install --target "$HOME/.config/litellm/ui-zh"
 python3 scripts/install.py check --target "$HOME/.config/litellm/ui-zh"
 ```
 
-目前已验证 macOS + LiteLLM `v1.101.0`：安装器完成 51 个 HTML 路由注入，`check` 通过，
-并在真实浏览器中检查中文覆盖层。其他版本欢迎补充兼容性反馈：
+LiteLLM `v1.101.0` 已完成 Ubuntu/macOS 真实包兼容验证；Ubuntu 额外完成数据库登录与 15 个核心管理路由人工截图复核。其他版本欢迎补充兼容性反馈：
 https://github.com/leonathan369-droid/litellm-ui-zh/blob/main/docs/compatibility.md
 
 这是社区补丁，不是 LiteLLM 官方发布。请不要在 Issue 中提交 API Key、`MASTER_KEY`、
@@ -53,7 +51,7 @@ Cookie、数据库 URL、完整配置或未脱敏日志。觉得有帮助的话�
 自部署 LiteLLM 时，WebUI 里不少管理页面还是英文。我做了一个非官方简体中文覆盖层：
 https://github.com/leonathan369-droid/litellm-ui-zh
 
-版本信息：补丁 `v0.1.2`；已验证 LiteLLM `v1.101.0`（macOS）。
+版本信息：补丁 `v0.2.0`；已兼容审查 LiteLLM `v1.101.0`（Ubuntu + macOS；平台人工覆盖范围见兼容性记录）。
 
 核心思路是不直接改 LiteLLM 安装包：安装器把它自带的静态 UI 复制到单独目录，再注入
 翻译脚本。这样更新时可重新安装，出了问题也能 `check` 校验或 `restore` 回退，补丁不改
@@ -74,8 +72,7 @@ python3 scripts/install.py check --target "$HOME/.config/litellm/ui-zh"
 export LITELLM_UI_PATH="$HOME/.config/litellm/ui-zh"
 ```
 
-目前只实际验证了 macOS + LiteLLM `v1.101.0`：51 个 HTML 路由完成注入，`check` 通过，
-浏览器内已手动检查。Linux、Windows 和其他 LiteLLM 版本还没有承诺，欢迎按兼容性模板
+LiteLLM `v1.101.0` 已完成 Ubuntu/macOS 真实包兼容验证；Ubuntu 额外完成 15 个核心管理路由人工复核。Windows 和其他 LiteLLM 版本还没有承诺，欢迎按兼容性模板
 反馈：
 https://github.com/leonathan369-droid/litellm-ui-zh/blob/main/docs/compatibility.md
 
@@ -98,7 +95,7 @@ LiteLLM Proxy 的 WebUI 可用于模型、路由、密钥和用量等管理。�
 我做了一个非官方的简体中文覆盖层：
 https://github.com/leonathan369-droid/litellm-ui-zh
 
-版本信息：补丁 `v0.1.2`；已验证 LiteLLM `v1.101.0`（macOS）。
+版本信息：补丁 `v0.2.0`；已兼容审查 LiteLLM `v1.101.0`（Ubuntu + macOS；平台人工覆盖范围见兼容性记录）。
 
 它的做法是把 LiteLLM 自带的静态 UI 复制到独立目录，然后在这个副本里注入浏览器端翻译
 脚本。LiteLLM Python 包不被改动，Proxy API、模型路由、数据库、密钥和计费逻辑也不在
@@ -139,9 +136,7 @@ python3 scripts/install.py restore --target "$HOME/.config/litellm/ui-zh"
 
 ## 当前验证范围
 
-当前补丁版本为 `v0.1.2`，且仅验证 macOS + LiteLLM `v1.101.0`：安装器完成 51 个 HTML
-路由注入，`check` 通过，
-并手动检查了真实浏览器界面。Linux、Windows 和其他 LiteLLM 版本仍待验证，详细记录：
+当前补丁版本为 `v0.2.0`。LiteLLM `v1.101.0` 已完成 Ubuntu/macOS 真实包兼容验证；Ubuntu 额外完成 PostgreSQL 登录与 15 个核心管理路由人工截图复核。Windows 与其他 LiteLLM 版本仍待验证，详细记录：
 https://github.com/leonathan369-droid/litellm-ui-zh/blob/main/docs/compatibility.md
 
 这是社区补丁，不是 LiteLLM 官方发布。项目有帮助欢迎点个 Star；翻译建议、安装问题或
@@ -153,7 +148,7 @@ https://github.com/leonathan369-droid/litellm-ui-zh/blob/main/docs/compatibility
 
 | 项目 | 当前结论 | 发布动作 |
 | --- | --- | --- |
-| 版本标注 | 三版均标明补丁 `v0.1.2` 与 `macOS + LiteLLM v1.101.0` 已验证 | 不增加“全平台”“完全兼容”“官方”表述 |
+| 版本标注 | 三版均标明补丁 `v0.2.0` 与 LiteLLM v1.101.0 的 Ubuntu/macOS 兼容范围，并区分人工覆盖差异 | 不增加“全平台”“完全兼容”“官方”表述 |
 | 图片 | 预览图已人工审查为脱敏的真实空状态页面 | 仅使用 `docs/assets/litellm-ui-zh-preview.png` |
 | 反馈入口 | 已有翻译、安装、兼容性 Issue 表单 | 只链接仓库 Issue，不要求用户在帖子中贴诊断 |
 | GitHub Discussion | 已启用；版本 A 已在 `Announcements` 发布为 [Discussion #1](https://github.com/leonathan369-droid/litellm-ui-zh/discussions/1) | 观察反馈并维护该公告；不以 Issue 替代 |

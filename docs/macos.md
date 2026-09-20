@@ -1,18 +1,35 @@
 # macOS setup
 
-The installer deliberately does not modify LaunchAgents, shell profiles, or
-LiteLLM configuration. After a successful install, set `LITELLM_UI_PATH` in
-the same environment that starts LiteLLM:
+安装器不会修改 LaunchAgents、shell profile 或 LiteLLM 配置。
+
+安装：
+
+```zsh
+python3 scripts/install.py install \
+  --target "$HOME/.config/litellm/ui-zh"
+```
+
+LiteLLM 或本仓库升级后：
+
+```zsh
+python3 scripts/install.py upgrade \
+  --target "$HOME/.config/litellm/ui-zh"
+```
+
+检查：
+
+```zsh
+python3 scripts/install.py check --target "$HOME/.config/litellm/ui-zh"
+python3 scripts/install.py diagnose --target "$HOME/.config/litellm/ui-zh"
+```
+
+启动 LiteLLM 的同一环境中设置：
 
 ```zsh
 export LITELLM_UI_PATH="$HOME/.config/litellm/ui-zh"
 litellm --host 127.0.0.1 --port 4000
 ```
 
-For a `launchd` service, add the environment variable to the service's own
-startup command, then reload or restart that service. Do not place API keys,
-database URLs, or master keys in this repository or in shell history.
+对于 launchd，把 `LITELLM_UI_PATH` 放到实际服务启动环境，而不是只放在交互 Shell。不要把密钥、数据库 URL 或完整生产配置写入本仓库或 shell history。
 
-To return to the original WebUI, remove `LITELLM_UI_PATH` and restart LiteLLM.
-`restore` is useful when you want the custom directory to contain a pristine
-copy of the packaged UI while retaining the previous patched copy as a backup.
+回到原始 WebUI 时移除 `LITELLM_UI_PATH` 并重启；也可以使用 `restore` 把自定义目录恢复成当前 LiteLLM 原始 UI，同时保留旧补丁备份。
