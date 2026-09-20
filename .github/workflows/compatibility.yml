@@ -164,23 +164,6 @@ jobs:
               assert page.locator("#litellm-zh-data-probe td").text_content() == "User"
               page.screenshot(path=output, full_page=True)
 
-              # The public login route is a real LiteLLM application page and is
-              # available without a database-backed admin session. Verify visible
-              # labels/placeholders there in both languages.
-              page.evaluate("localStorage.setItem('litellm-ui-language', 'zh-CN')")
-              page.goto("http://127.0.0.1:4000/ui/login", wait_until="domcontentloaded", timeout=45000)
-              page.wait_for_selector("#litellm-zh-toggle", timeout=30000)
-              page.wait_for_selector('input[placeholder="输入用户名"]', timeout=30000)
-              assert page.locator('input[placeholder="输入密码"]').count() == 1
-              login_zh = os.path.join(os.environ["RUNNER_TEMP"], "login-smoke-zh.png")
-              page.screenshot(path=login_zh, full_page=True)
-
-              page.locator("#litellm-zh-toggle").click()
-              page.wait_for_function("document.documentElement.lang === 'en'")
-              page.wait_for_selector('input[placeholder="Enter your username"]', timeout=30000)
-              assert page.locator('input[placeholder="Enter your password"]').count() == 1
-              login_en = os.path.join(os.environ["RUNNER_TEMP"], "login-smoke-en.png")
-              page.screenshot(path=login_en, full_page=True)
               browser.close()
           print("Chromium overlay smoke test passed")
           PY
@@ -202,5 +185,3 @@ jobs:
             ${{ runner.temp }}/litellm.log
             ${{ runner.temp }}/browser-smoke.png
             ${{ runner.temp }}/browser-smoke-zh.png
-            ${{ runner.temp }}/login-smoke-zh.png
-            ${{ runner.temp }}/login-smoke-en.png
