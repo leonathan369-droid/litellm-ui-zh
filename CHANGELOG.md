@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Expand the LiteLLM 1.105.1 dictionary from 739 to 6,100 entries, covering Lens, management dialogs, permissions, routing, cost views, MCP, agents, and shared form text.
+- Add regression cases for audited labels, exact English restoration, and dictionary collisions with protected data/code/input values.
+
 - Validate LiteLLM 1.105.1 on isolated Ubuntu with PostgreSQL-backed login and 15 core admin routes; update compatibility workflows to the exact release and Prisma 0.15.0.
 - Wait for the initial React loading shell to be replaced before translating, preventing the reproduced hydration error #418.
 - Restore a removed language toggle without resetting the selected language.

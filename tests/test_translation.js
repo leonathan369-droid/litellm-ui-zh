@@ -392,3 +392,68 @@ test("preserves protected attributes when upstream updates them dynamically", ()
     assert.equal(element.getAttribute("title"), "Admin");
   }
 });
+
+
+test("translates the audited management labels and restores their exact English", () => {
+  const cases = [
+    ["Traces", "追踪"],
+    ["Investigations", "调查"],
+    ["Find what needs attention", "发现需要关注的问题"],
+    ["Set up traces", "配置追踪"],
+    ["Basic Information (Required)", "基本信息（必填）"],
+    ["Version (Optional)", "版本（可选）"],
+    ["Run an investigation", "运行调查"],
+    ["Add New Skill", "添加技能"],
+    ["No vector stores", "暂无向量存储"],
+    ["Request Lifecycle", "请求生命周期"],
+    ["Cost Breakdown", "成本明细"],
+    ["Create New Policy", "创建新策略"],
+    ["Prompt Details", "提示词详情"],
+    ["Publish Prompt", "发布提示词"],
+    ["No conversations found", "未找到对话"],
+    ["Test Configuration", "测试配置"],
+    ["Regenerate Virtual Key", "重新生成虚拟密钥"],
+    ["Member Permissions", "成员权限"],
+    ["User Settings", "用户设置"],
+    ["Edit Budget", "编辑预算"],
+    ["Configure Model Fallbacks", "配置模型回退"],
+  ];
+  const labels = cases.map(([english]) => {
+    const label = new Element("label");
+    label.appendChild(new TextNode(english));
+    return label;
+  });
+  const env = createEnvironment(labels);
+  assert.deepEqual(labels.map((label) => label.childNodes[0].nodeValue), cases.map(([, chinese]) => chinese));
+  env.toggle.click();
+  assert.deepEqual(labels.map((label) => label.childNodes[0].nodeValue), cases.map(([english]) => english));
+  env.toggle.click();
+  assert.deepEqual(labels.map((label) => label.childNodes[0].nodeValue), cases.map(([, chinese]) => chinese));
+});
+
+
+test("new dictionary words do not translate matching model data, code, or user input", () => {
+  const values = ["Traces", "Investigations", "Project", "System", "Assistant"];
+  const nodes = [];
+  const containers = [];
+  for (const tag of ["td", "code", "pre", "textarea", "input"]) {
+    for (const value of values) {
+      const element = new Element(tag);
+      const text = new TextNode(value);
+      element.appendChild(text);
+      nodes.push([text, value]);
+      containers.push(element);
+    }
+  }
+  const input = new Element("input");
+  input.value = "Project";
+  input.setAttribute("placeholder", "Enter User ID…");
+  const env = createEnvironment([...containers, input]);
+  assert.equal(input.getAttribute("placeholder"), "输入用户 ID…");
+  for (let i = 0; i < 3; i += 1) {
+    for (const [node, original] of nodes) assert.equal(node.nodeValue, original);
+    assert.equal(input.value, "Project");
+    env.toggle.click();
+  }
+  assert.equal(input.getAttribute("placeholder"), "Enter User ID…");
+});
