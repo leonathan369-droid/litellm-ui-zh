@@ -8,7 +8,7 @@
 
 当前发布版本为 **v0.2.0**。LiteLLM **v1.101.0 / Ubuntu + macOS** 已完成精确包安装、启动、UI 注入和浏览器级自动化验证；其中 Ubuntu 还完成了 PostgreSQL 支撑的真实 Admin UI 登录、15 个核心管理路由检查与人工截图复核。为避免把 Ubuntu 的人工结果夸大到 macOS，版本级 `check` 状态仍保守记录为 `AUTOMATED_VERIFIED`。LiteLLM **v1.99.0 / macOS** 保留历史 `VERIFIED` 记录。完整范围见 [兼容性记录](docs/compatibility.md)。
 
-主分支另包含 **LiteLLM 1.105.1 / Ubuntu** 的本地兼容验证与初始化、动态属性保护修复，记录为 `AUTOMATED_VERIFIED`。该版本的 macOS、生产自定义插件及完整人工操作尚未验收；详见[兼容性记录](docs/compatibility.md#litellm-11051-本地验证2026-10-15)。这些改动尚未发布为新的版本标签。
+主分支另包含 **LiteLLM 1.105.1 / Ubuntu** 的本地兼容验证与初始化、动态属性保护修复，记录为 `AUTOMATED_VERIFIED`。该版本另通过 Ubuntu 生产部署的 15 路由及自定义报表 iframe 验收；macOS 及完整人工操作尚未验收；详见[兼容性记录](docs/compatibility.md#litellm-11051-本地验证2026-10-15)。这些改动尚未发布为新的版本标签。
 
 ## 快速安装
 
