@@ -19,6 +19,17 @@
 
 LiteLLM 1.101.0 的版本级状态仍记为 **AUTOMATED_VERIFIED**，原因是当前逐页人工视觉复核是在 Ubuntu/Linux Chromium 环境完成的；macOS 已通过真实包兼容自动化，但没有宣称完成同等范围的逐页人工检查。这样 `check` 不会把某一平台的人工结果误报成所有平台均 VERIFIED。
 
+## LiteLLM 1.105.1 本地验证（2026-10-15）
+
+状态为 **AUTOMATED_VERIFIED，仅 Ubuntu**。使用 Ubuntu 26.04、Python 3.12、独立 PostgreSQL 18、Prisma 0.15.0 和 Google Chrome；未连接生产数据库或真实模型供应商。
+
+- 精确包安装、独立 UI 副本 install/upgrade/check/diagnose、55 个 HTML 路由注入通过；实际提供的 JS 与构建产物一致，原始包内 772 个 UI 文件仍与 wheel RECORD 哈希一致。
+- 21 项 Python 测试和 9 项 JavaScript 测试通过，生成产物可重复构建；静态候选扫描没有新增未审核英文。
+- 真实管理员登录和上述 15 个核心路由检查通过，每页执行中文→英文→中文切换，关键 placeholder 断言通过，没有浏览器 pageerror。
+- 初始外挂曾因提前翻译 SSR 加载文字触发 React #418；关闭外挂的对照页无错误。延迟到原加载容器被 React 移除后初始化，真实浏览器对照复验错误消失。另修复动态属性绕过数据保护和切换按钮被移除后无法恢复。
+- 检查了模型与管理员设置页截图；这不是所有页面、所有弹窗和 CRUD 操作的完整人工验收。未测试 macOS、付费 Enterprise 功能、真实模型调用或生产自定义插件；策略模板、业务数据、品牌和技术标识允许保持原文。
+- CI 工作流已更新为 1.105.1；本记录依据本地验证，不把未执行的 GitHub Actions 或 macOS 工作流写为通过。
+
 ## 新版本验证流程
 
 1. 等待 LiteLLM stable release；RC/dev/nightly 不作为兼容发布目标。

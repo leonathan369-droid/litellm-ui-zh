@@ -1,7 +1,7 @@
 {
   "project": "BerriAI/litellm",
   "latest_verified": "1.99.0",
-  "latest_automated_verified": "1.101.0",
+  "latest_automated_verified": "1.105.1",
   "patch_version": "0.2.0",
   "verified": [
     {
@@ -36,6 +36,24 @@
         "15 core Admin UI routes checked on Linux",
         "manual screenshot review on Linux",
         "translated placeholder regression assertions on audited routes"
+      ]
+    },
+    {
+      "litellm": "1.105.1",
+      "os": [
+        "Ubuntu"
+      ],
+      "status": "automated-verified",
+      "date": "2026-10-15",
+      "scope": [
+        "exact package install on Ubuntu 26.04 / Python 3.12",
+        "isolated PostgreSQL 18 with Prisma 0.15.0",
+        "overlay install/upgrade/check/diagnose; 55 HTML routes",
+        "served overlay checksum and 772 original packaged UI file hashes",
+        "Google Chrome authenticated login and 15 core Admin UI routes",
+        "English/Chinese switching on every audited route",
+        "translated placeholder assertions and no browser page errors",
+        "hydration A/B regression: original overlay reproduced React #418; fixed overlay did not"
       ]
     }
   ]

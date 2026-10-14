@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Validate LiteLLM 1.105.1 on isolated Ubuntu with PostgreSQL-backed login and 15 core admin routes; update compatibility workflows to the exact release and Prisma 0.15.0.
+- Wait for the initial React loading shell to be replaced before translating, preventing the reproduced hydration error #418.
+- Restore a removed language toggle without resetting the selected language.
+- Preserve protected data and ignored regions when translatable attributes change dynamically.
+- Add regression tests, per-route language switching and browser-error checks, and translate newly observed 1.105.1 interface text.
+- Keep the 1.105.1 compatibility claim limited to local Ubuntu automation; macOS and production integrations remain unverified.
+
 ## 0.2.0 - 2026-09-20
 
 - Reworked translation matching to avoid generic substring replacement of user-visible data.

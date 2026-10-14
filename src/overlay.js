@@ -118,6 +118,7 @@
   }
 
   function translateAttribute(element, attribute, language) {
+    if (shouldSkipAttributes(element)) return;
     if (!element.hasAttribute(attribute)) return;
     var current = element.getAttribute(attribute);
     if (current === null) return;
@@ -159,12 +160,14 @@
     }
   }
 
-  function addToggle() {
+  function addToggle(language) {
     if (document.getElementById("litellm-zh-toggle")) return;
     var button = document.createElement("button");
     button.id = "litellm-zh-toggle";
     button.type = "button";
     button.setAttribute("data-litellm-zh-ignore", "");
+    button.textContent = language === "zh-CN" ? "中 / EN" : "EN / 中";
+    button.setAttribute("aria-label", language === "zh-CN" ? "切换到英文" : "切换到中文");
     button.style.cssText = "position:fixed;right:18px;bottom:18px;z-index:2147483647;border:1px solid #cbd5e1;border-radius:999px;background:#fff;color:#0f172a;padding:7px 12px;font:600 13px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;box-shadow:0 2px 10px rgba(15,23,42,.16);cursor:pointer";
     button.addEventListener("click", function () {
       var nextLanguage = document.documentElement.dataset.litellmLanguage === "zh-CN" ? "en" : "zh-CN";
@@ -174,12 +177,36 @@
     document.body.appendChild(button);
   }
 
+  function findInitialLoadingShell() {
+    var spinners = document.body.querySelectorAll("[data-spinner-id]");
+    for (var i = 0; i < spinners.length; i += 1) {
+      var current = spinners[i].parentElement;
+      while (current && current !== document.body) {
+        if (current.textContent.trim() === "Loading...") return current;
+        current = current.parentElement;
+      }
+    }
+    return null;
+  }
+
   function start() {
     var language = localStorage.getItem(STORAGE_KEY) === "en" ? "en" : "zh-CN";
-    addToggle();
-    applyLanguage(language);
+    var initialLoadingShell = findInitialLoadingShell();
+    if (!initialLoadingShell) {
+      addToggle(language);
+      applyLanguage(language);
+    }
 
     new MutationObserver(function (records) {
+      // DOMContentLoaded can precede React hydration. Keep its server-rendered
+      // loading shell untouched until React replaces it with the actual UI.
+      if (initialLoadingShell) {
+        if (document.body.contains(initialLoadingShell)) return;
+        initialLoadingShell = null;
+        addToggle(language);
+        applyLanguage(language);
+        return;
+      }
       var activeLanguage = document.documentElement.dataset.litellmLanguage || language;
       records.forEach(function (record) {
         if (record.type === "characterData") {
@@ -196,6 +223,9 @@
           translateNode(node, activeLanguage);
         });
       });
+      // React hydration can remove the button appended outside its root.
+      // Only recreate it when missing, so its own mutations do not loop.
+      addToggle(activeLanguage);
     }).observe(document.body, {
       childList: true,
       characterData: true,
