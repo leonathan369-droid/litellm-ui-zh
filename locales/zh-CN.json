@@ -1723,7 +1723,7 @@
   "Activity window": "活动时间范围",
   "Analysis cost": "分析成本",
   "This older batch predates saved result snapshots. Its findings remain available under All accumulated findings.": "这批较早的记录生成于结果快照保存功能启用之前。其发现仍可在“全部累计发现”中查看。",
-  "Open": "待处理",
+  "Open": "打开",
   "Resolved": "已解决",
   "Dismissed": "已忽略",
   "issue": "问题",

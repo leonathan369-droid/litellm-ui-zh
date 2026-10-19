@@ -457,3 +457,31 @@ test("new dictionary words do not translate matching model data, code, or user i
   }
   assert.equal(input.getAttribute("placeholder"), "Enter User ID…");
 });
+
+
+test("translates Open as an action except in a visible table header, where it counts open items", () => {
+  const paletteHint = new Element("span");
+  const paletteText = new TextNode(" Open");
+  paletteHint.appendChild(paletteText);
+  const description = new Element("p");
+  const descriptionText = new TextNode("Open");
+  description.appendChild(descriptionText);
+  const header = new Element("th");
+  const headerText = new TextNode("Open");
+  header.appendChild(headerText);
+  const hiddenHeader = new Element("th");
+  hiddenHeader.setAttribute("class", "px-2 sr-only");
+  const hiddenHeaderText = new TextNode("Open");
+  hiddenHeader.appendChild(hiddenHeaderText);
+  const env = createEnvironment([paletteHint, description, header, hiddenHeader]);
+
+  assert.equal(paletteText.nodeValue, " 打开");
+  assert.equal(descriptionText.nodeValue, "打开");
+  assert.equal(headerText.nodeValue, "待处理");
+  assert.equal(hiddenHeaderText.nodeValue, "打开");
+  env.toggle.click();
+  assert.equal(paletteText.nodeValue, " Open");
+  assert.equal(descriptionText.nodeValue, "Open");
+  assert.equal(headerText.nodeValue, "Open");
+  assert.equal(hiddenHeaderText.nodeValue, "Open");
+});

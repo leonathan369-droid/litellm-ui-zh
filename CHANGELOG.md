@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Translate `Open` as the action “打开”, keeping “待处理” only in visible table headers (open-item counts) through a header context rule; the previous translation was wrong in the command palette, the Entra description, and screen-reader action column headers.
 - Add 251 entries (6,100 to 6,351) for LiteLLM 1.106.0's new Home page, its command palette and account menu, and the redesigned Lens onboarding, tabs, signals, and demo-data finding, trace, and investigation views; extend the data-protection regression case with the new generic words.
 
 - Expand the LiteLLM 1.105.1 dictionary from 739 to 6,100 entries, covering Lens, management dialogs, permissions, routing, cost views, MCP, agents, and shared form text.

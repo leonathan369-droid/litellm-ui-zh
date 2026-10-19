@@ -9,6 +9,10 @@
   var TEXT_SKIP_TAGS = /^(SCRIPT|STYLE|NOSCRIPT|TEXTAREA|INPUT|SELECT|OPTION|PRE|CODE)$/;
   var ATTRIBUTE_SKIP_TAGS = /^(SCRIPT|STYLE|NOSCRIPT|PRE|CODE)$/;
   var DATA_CELL_CONTROL_TAGS = /^(BUTTON|LABEL)$/;
+  // Exact labels whose meaning depends on where they appear. A visible table
+  // header "Open" counts open items; elsewhere, including a screen-reader-only
+  // header for a row action column, "Open" is the action in the dictionary.
+  var HEADER_TRANSLATIONS = { "Open": "待处理" };
 
   function hasOwn(object, key) {
     return Object.prototype.hasOwnProperty.call(object, key);
@@ -59,9 +63,16 @@
     return ATTRIBUTE_SKIP_TAGS.test(element.tagName || "");
   }
 
-  function translateExact(value) {
-    if (hasOwn(translations, value)) return translations[value];
+  function isVisibleTableHeader(element) {
+    for (var current = element; current; current = current.parentElement) {
+      if ((current.tagName || "") !== "TH") continue;
+      var classes = (current.getAttribute && current.getAttribute("class")) || "";
+      return !/(^|\s)sr-only(\s|$)/.test(classes);
+    }
+    return false;
+  }
 
+  function translateExact(value, element) {
     var leadingMatch = value.match(/^\s*/);
     var trailingMatch = value.match(/\s*$/);
     var leading = leadingMatch ? leadingMatch[0] : "";
@@ -69,16 +80,20 @@
     var coreEnd = value.length - trailing.length;
     var core = value.slice(leading.length, coreEnd);
 
+    if (core && hasOwn(HEADER_TRANSLATIONS, core) && isVisibleTableHeader(element)) {
+      return leading + HEADER_TRANSLATIONS[core] + trailing;
+    }
+    if (hasOwn(translations, value)) return translations[value];
     if (core && hasOwn(translations, core)) {
       return leading + translations[core] + trailing;
     }
     return value;
   }
 
-  function translatedState(source) {
+  function translatedState(source, element) {
     return {
       source: source,
-      translated: translateExact(source),
+      translated: translateExact(source, element),
     };
   }
 
@@ -89,12 +104,12 @@
     var state = TEXT_STATES.get(node);
 
     if (!state) {
-      state = translatedState(current);
+      state = translatedState(current, node.parentElement);
       TEXT_STATES.set(node, state);
     } else if (current !== state.source && current !== state.translated) {
       // React or another upstream script changed this node. Treat the new value
       // as the authoritative source instead of restoring the first value ever seen.
-      state = translatedState(current);
+      state = translatedState(current, node.parentElement);
       TEXT_STATES.set(node, state);
     }
 
@@ -111,7 +126,7 @@
 
     var state = states[attribute];
     if (!state || (current !== state.source && current !== state.translated)) {
-      state = translatedState(current);
+      state = translatedState(current, element);
       states[attribute] = state;
     }
     return state;
