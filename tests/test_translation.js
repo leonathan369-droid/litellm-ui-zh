@@ -433,7 +433,7 @@ test("translates the audited management labels and restores their exact English"
 
 
 test("new dictionary words do not translate matching model data, code, or user input", () => {
-  const values = ["Traces", "Investigations", "Project", "System", "Assistant"];
+  const values = ["Traces", "Investigations", "Project", "System", "Assistant", "Home", "ok", "Live", "Errors", "Completed", "Datasets"];
   const nodes = [];
   const containers = [];
   for (const tag of ["td", "code", "pre", "textarea", "input"]) {
