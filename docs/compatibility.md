@@ -33,8 +33,8 @@ LiteLLM 1.101.0 的版本级状态仍记为 **AUTOMATED_VERIFIED**，原因是�
 ## 新版本验证流程
 
 1. 等待 LiteLLM stable release；RC/dev/nightly 不作为兼容发布目标。
-2. 创建兼容分支并安装精确版本。
-3. 运行 `install.py upgrade/check/diagnose`。
+2. 按[维护 SOP](maintenance.md#2-核对分支与目标版本)核对当前分支，在隔离环境安装精确版本；仅在用户明确要求时创建兼容分支。
+3. 按[真实 LiteLLM 验证](maintenance.md#4-真实-litellm-验证)对本任务测试目录执行首次 install 或后续 upgrade，以及 check/diagnose。
 4. 运行 `scripts/collect_strings.py` 收集静态 HTML 新候选英文。
 5. 运行完整 CI、真实 LiteLLM compatibility workflow 与数据库支持的 Admin UI route review。
 6. 人工检查核心路由：Virtual Keys、Models + Endpoints、Playground、Usage、Agents、Skills、MCP Servers、Guardrails、Policies、Teams、Internal Users、Budgets、Logs、Router Settings、Admin Settings。

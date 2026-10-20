@@ -88,6 +88,8 @@ Overlay 会跳过代码、预格式化文本、可编辑区域和显式标记 `d
 
 ## 维护与贡献
 
+AI 维护入口为 [litellm-ui-zh-maintain skill](.agents/skills/litellm-ui-zh-maintain/SKILL.md)，覆盖汉化上游同步、补翻译、运行时修复和精确版本兼容验证；网关侧部署由使用方仓库负责。
+
 维护 SOP 见 [docs/maintenance.md](docs/maintenance.md)，架构边界见 [docs/architecture.md](docs/architecture.md)。新 LiteLLM stable release 会由 GitHub Actions 自动发现并建立兼容性任务，但**不会自动标记兼容，也不会自动发布 Release**。
 
 普通翻译优先只修改 `locales/zh-CN.json`，然后运行：

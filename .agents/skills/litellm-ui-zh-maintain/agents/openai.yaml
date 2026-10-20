@@ -1,0 +1,4 @@
+interface:
+  display_name: "LiteLLM 汉化维护"
+  short_description: "维护中文词条与翻译运行时，复用现有工具验证构建、数据保护和精确版本兼容性"
+  default_prompt: "使用 $litellm-ui-zh-maintain 按本次范围维护 LiteLLM 中文 Overlay，并报告实际验证范围与未验证项。"
