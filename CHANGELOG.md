@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- Translate `Open` as the action “打开”, keeping “待处理” only in visible table headers (open-item counts) through a header context rule; the previous translation was wrong in the command palette, the Entra description, and screen-reader action column headers.
+- Add 251 entries (6,100 to 6,351) for LiteLLM 1.106.0's new Home page, its command palette and account menu, and the redesigned Lens onboarding, tabs, signals, and demo-data finding, trace, and investigation views; extend the data-protection regression case with the new generic words.
+
+- Expand the LiteLLM 1.105.1 dictionary from 739 to 6,100 entries, covering Lens, management dialogs, permissions, routing, cost views, MCP, agents, and shared form text.
+- Add regression cases for audited labels, exact English restoration, and dictionary collisions with protected data/code/input values.
+
+- Validate LiteLLM 1.105.1 on isolated Ubuntu with PostgreSQL-backed login and 15 core admin routes; update compatibility workflows to the exact release and Prisma 0.15.0.
+- Wait for the initial React loading shell to be replaced before translating, preventing the reproduced hydration error #418.
+- Restore a removed language toggle without resetting the selected language.
+- Preserve protected data and ignored regions when translatable attributes change dynamically.
+- Add regression tests, per-route language switching and browser-error checks, and translate newly observed 1.105.1 interface text.
+- Verify the same overlay in an Ubuntu production deployment, including 15 admin routes and a custom reports plugin iframe; macOS and exhaustive manual workflows remain unverified.
+
 ## 0.2.0 - 2026-09-20
 
 - Reworked translation matching to avoid generic substring replacement of user-visible data.

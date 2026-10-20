@@ -19,11 +19,22 @@
 
 LiteLLM 1.101.0 的版本级状态仍记为 **AUTOMATED_VERIFIED**，原因是当前逐页人工视觉复核是在 Ubuntu/Linux Chromium 环境完成的；macOS 已通过真实包兼容自动化，但没有宣称完成同等范围的逐页人工检查。这样 `check` 不会把某一平台的人工结果误报成所有平台均 VERIFIED。
 
+## LiteLLM 1.105.1 本地验证（2026-10-15）
+
+状态为 **AUTOMATED_VERIFIED，仅 Ubuntu**。使用 Ubuntu 26.04、Python 3.12、独立 PostgreSQL 18、Prisma 0.15.0 和 Google Chrome；未连接生产数据库或真实模型供应商。
+
+- 精确包安装、独立 UI 副本 install/upgrade/check/diagnose、55 个 HTML 路由注入通过；实际提供的 JS 与构建产物一致，原始包内 772 个 UI 文件仍与 wheel RECORD 哈希一致。
+- 21 项 Python 测试和 9 项 JavaScript 测试通过，生成产物可重复构建；静态候选扫描没有新增未审核英文。
+- 真实管理员登录和上述 15 个核心路由检查通过，每页执行中文→英文→中文切换，关键 placeholder 断言通过，没有浏览器 pageerror。
+- 初始外挂曾因提前翻译 SSR 加载文字触发 React #418；关闭外挂的对照页无错误。延迟到原加载容器被 React 移除后初始化，真实浏览器对照复验错误消失。另修复动态属性绕过数据保护和切换按钮被移除后无法恢复。
+- 检查了模型与管理员设置页截图；这不是所有页面、所有弹窗和 CRUD 操作的完整人工验收。该轮未测试 macOS、付费 Enterprise 功能、真实模型调用或生产自定义插件；策略模板、业务数据、品牌和技术标识允许保持原文。
+- CI 工作流已更新为 1.105.1；本记录依据本地验证，不把未执行的 GitHub Actions 或 macOS 工作流写为通过。
+
 ## 新版本验证流程
 
 1. 等待 LiteLLM stable release；RC/dev/nightly 不作为兼容发布目标。
-2. 创建兼容分支并安装精确版本。
-3. 运行 `install.py upgrade/check/diagnose`。
+2. 按[维护 SOP](maintenance.md#2-核对分支与目标版本)核对当前分支，在隔离环境安装精确版本；仅在用户明确要求时创建兼容分支。
+3. 按[真实 LiteLLM 验证](maintenance.md#4-真实-litellm-验证)对本任务测试目录执行首次 install 或后续 upgrade，以及 check/diagnose。
 4. 运行 `scripts/collect_strings.py` 收集静态 HTML 新候选英文。
 5. 运行完整 CI、真实 LiteLLM compatibility workflow 与数据库支持的 Admin UI route review。
 6. 人工检查核心路由：Virtual Keys、Models + Endpoints、Playground、Usage、Agents、Skills、MCP Servers、Guardrails、Policies、Teams、Internal Users、Budgets、Logs、Router Settings、Admin Settings。
@@ -39,3 +50,47 @@ python3 scripts/install.py diagnose --target "$HOME/.config/litellm/ui-zh"
 ```
 
 提交兼容性 Issue 时不要包含 API Key、MASTER_KEY、Cookie、数据库 URL、完整配置、请求内容或未脱敏日志。
+
+
+### Ubuntu 生产补充验证（2026-10-15）
+
+在自有生产环境部署同一份外挂（代码提交 `38f0bbd935fadba5333500abd303d7ffe4bf5eb7`），LiteLLM 保持 1.105.1。应用侧发布工具从安装包复制独立 UI 并注入外挂；这项结果验证运行时外挂，不代表在该生产环境运行了本仓库安装器。
+
+- 55 个 HTML 路由注入完成，线上 JS 校验和与构建产物一致，官方包中的 HTML 未修改。
+- 真实 HTTPS 管理登录 API、中文登录页面、15 个核心管理路由以及每页中英切换通过；Chromium `pageerror` 为 0。
+- 模型与 Team 名称保持原文；从原生菜单打开自定义费用报表 iframe，原生短期身份交换及报表加载成功。
+- 模型、Team、业务 Key 配置与报表文件在部署前后摘要一致；服务无异常重启。
+- 仍为 `AUTOMATED_VERIFIED`：不扩大到 macOS、全部 CRUD、Enterprise 功能、其他自定义插件或真实厂商调用。生产截图、凭据和业务数据不提交到本仓库。
+
+
+### 1.105.1 固定界面文案补齐（2026-10-15）
+
+本轮针对 Lens 未翻译的问题扩展到管理界面固定文案，词典从 739 条增加至 6,100 条（新增 5,361 条）。补齐范围包含主页面、详情、弹窗、空态、表单、条件按钮、提示、无障碍标签及独立的固定文本片段；保留现有精确匹配与数据保护机制，不修改 LiteLLM 或翻译运行时代码。
+
+静态核查使用与部署包逐文件哈希一致的 1.105.1 官方 HTML/JS。分模块交叉评审修正了配置“键名”和延迟缓冲百分比的译法；代码、模型标识、URL 和技术参数保持原样。词条数量不是全部页面或功能完整覆盖的证明。
+
+明确保留边界：服务器返回的策略模板/业务内容、模型与项目名称不做泛化翻译；含日期的完整动态拼接句（例如模型洞察时间范围、累计节省时间段）仍可能为英文。未加入通配替换，未执行真实厂商推理、OAuth/worker 接入、付费 Enterprise 功能或全量 CRUD。
+
+本轮验证（40 页检查后追加 9 个组合标签，再针对智能体、技能、MCP 页面复验，并重新验证完整词典往返）：
+
+- 21 项 Python 测试、11 项 JavaScript 测试、构建可重复性与语法检查通过。
+- 隔离 PostgreSQL 支持的 LiteLLM 1.105.1 中，以专用测试管理员会话访问 40 个页面，逐页中文→英文→中文切换，JavaScript pageerror 为 0；另打开新建密钥、团队、预算、智能体、技能、搜索工具、MCP 服务器、访问组和标签等弹窗（不提交）。Lens 截图人工检查通过。
+- Chromium 真实 DOM 对全部 6,100 条词条验证中文显示及英文精确恢复；同名数据单元格、代码、输入值和独立 iframe 内容保持原文。它验证匹配/恢复机制，不证明所有页面分支均已人工验收。
+- 最终资源 SHA256：`59d4af30c3b80e5de254e224e48caa78abf942f444ec4aa3e0acc0673c286adb`。浏览器正常关闭并验证退出。
+- 本轮浏览器证据来自本地隔离环境，不代表已完成生产登录浏览器验收；生产交付和 HTTP 检查由使用方仓库单独记录。
+
+
+### 1.106.0 首页与 Lens 文案补齐（2026-10-19）
+
+LiteLLM 1.106.0 登录后默认进入新增的 Home 页，Lens 也随版本改版。本轮只补这两处的固定文案，词典从 6,100 条增加至 6,351 条（新增 251 条）：Home 页及其页头新增的命令面板（Ctrl K）、账户菜单；Lens 未部署时的引导页、追踪/发现/调查/数据集标签、信号设置、演示数据下的发现详情、追踪详情和调查详情。保留精确匹配与数据保护机制，不修改运行时代码。
+
+明确保留边界：Home 页“新动态/更新”里的上游博客资讯、Lens 演示数据中的模拟记录（发现标题与摘要、对话内容、调查名称、智能体名、邮箱）、工具名与标识保持原文；数字与文字同在一个文本节点的组合（如 `0 cache read`、`71.4% success rate`、`5m ago`、`$0.108 of $100.00 this month`），以及依赖上下文语序的碎片（`affected`、`traces`、`to`）无法用精确匹配处理，仍为英文。Moyai 宣传页、其他新增页面和 CI/`upstream.json` 的 1.106.0 兼容状态不在本轮范围，未更新。
+
+本轮验证（隔离 PostgreSQL 支持的 LiteLLM 1.106.0，未部署 Lens 服务）：
+
+- 21 项 Python 测试、11 项 JavaScript 测试（数据保护用例加入本轮新增的通用短词）、构建可重复性与语法检查通过。
+- 新词条均与真实页面收集到的原文逐字一致；复查 Home 与 Lens 各视图后，剩余英文全部属于上述保留边界。
+- 22 个管理路由 JavaScript pageerror 为 0；Lens 调查详情中文→英文→中文切换后与原文完全一致，智能体名与调查名称等演示数据保持原文。
+- 资源 SHA256：`c23868c2133f4976490993a5b70a0278158882470fe3fc99a234bbd719736fa9`。
+
+修正（同日）：`Open` 原译“待处理”，但在 1.106.0 的命令面板（`↵ Open`）、Entra 服务主体说明和 Lens 数据集表格的屏幕阅读器操作列头中都是动作，1.105.1 中唯一可见的 Entra 说明也是动作。词条改为“打开”，并在运行时增加表头上下文规则：可见 `th` 内的 `Open`（Lens 调查列表的待处理发现数量列）仍译“待处理”。新增回归用例先在旧构建上复现失败（命令面板得到“ 待处理”），修复后 21 项 Python 测试、12 项 JavaScript 测试与构建检查通过；隔离 LiteLLM 1.106.0 浏览器中命令面板显示“↵ 打开”、调查列表列头为“待处理”，22 个管理路由 pageerror 为 0。数据集表格无演示数据，未在浏览器中渲染，依据同一表头组件把 `sr-only` 加在 `th` 上的实现判断。资源 SHA256：`cdd3bbda66799feb5456c683f483556f50d1960a442779fe165abe3df050270f`。

@@ -36,6 +36,31 @@ class Element {
     return node;
   }
 
+  get textContent() {
+    return this.childNodes.length
+      ? this.childNodes.map((node) => node.nodeType === 3 ? node.nodeValue : node.textContent).join("")
+      : this._textContent;
+  }
+
+  set textContent(value) {
+    this._textContent = value;
+  }
+
+  contains(node) {
+    return this === node || this.childNodes.some((child) => child === node || (child.contains && child.contains(node)));
+  }
+
+  querySelectorAll(selector) {
+    assert.equal(selector, "[data-spinner-id]");
+    const found = [];
+    for (const child of this.childNodes) {
+      if (child.nodeType !== 1) continue;
+      if (child.hasAttribute("data-spinner-id")) found.push(child);
+      found.push(...child.querySelectorAll(selector));
+    }
+    return found;
+  }
+
   hasAttribute(name) {
     return this.attributes.has(name);
   }
@@ -72,6 +97,12 @@ function createEnvironment(children = []) {
     const result = originalAppendChild(node);
     if (node.id) elementsById.set(node.id, node);
     return result;
+  };
+  body.removeChild = (node) => {
+    body.childNodes.splice(body.childNodes.indexOf(node), 1);
+    node.parentElement = null;
+    if (node.id) elementsById.delete(node.id);
+    return node;
   };
 
   const document = {
@@ -131,6 +162,70 @@ test("restores the exact original English when a Chinese translation is ambiguou
   assert.equal(heading.nodeValue, "AI 网关");
   env.toggle.click();
   assert.equal(heading.nodeValue, "AI GATEWAY");
+});
+
+
+test("waits for React to replace its initial loading shell before modifying the DOM", () => {
+  const shell = new Element("div");
+  const spinner = new Element("svg");
+  spinner.setAttribute("data-spinner-id", "initial-spinner");
+  const loading = new TextNode("Loading...");
+  shell.appendChild(spinner);
+  shell.appendChild(loading);
+  const env = createEnvironment([shell]);
+
+  assert.equal(loading.nodeValue, "Loading...");
+  assert.equal(env.document.documentElement.lang, "en");
+  assert.equal(env.document.documentElement.dataset.litellmLanguage, undefined);
+  assert.equal(env.document.getElementById("litellm-zh-toggle"), null);
+  const unrelated = new Element("script");
+  env.body.appendChild(unrelated);
+  env.observer.callback([{ type: "childList", addedNodes: [unrelated], removedNodes: [] }]);
+  assert.equal(loading.nodeValue, "Loading...");
+  assert.equal(env.document.getElementById("litellm-zh-toggle"), null);
+
+  env.body.removeChild(shell);
+  const label = new TextNode("User");
+  env.body.appendChild(label);
+  env.observer.callback([{ type: "childList", addedNodes: [label], removedNodes: [shell] }]);
+  assert.equal(label.nodeValue, "用户");
+  assert.equal(env.document.documentElement.lang, "zh-CN");
+  const toggle = env.document.getElementById("litellm-zh-toggle");
+  assert.ok(toggle);
+  toggle.click();
+  env.observer.callback([{ type: "childList", addedNodes: [toggle], removedNodes: [] }]);
+  assert.equal(env.document.documentElement.lang, "en");
+  assert.equal(label.nodeValue, "User");
+  assert.equal(env.document.getElementById("litellm-zh-toggle"), toggle);
+});
+
+
+test("restores a removed language toggle without duplicating it or resetting the language", () => {
+  const heading = new TextNode("User");
+  const env = createEnvironment([heading]);
+
+  for (const language of ["zh-CN", "en"]) {
+    const previous = env.document.getElementById("litellm-zh-toggle");
+    env.body.removeChild(previous);
+    env.observer.callback([
+      { type: "childList", removedNodes: [previous], addedNodes: [] },
+    ]);
+    const restored = env.document.getElementById("litellm-zh-toggle");
+    assert.ok(restored);
+    assert.notEqual(restored, previous);
+    assert.equal(env.document.documentElement.dataset.litellmLanguage, language);
+    assert.equal(restored.textContent, language === "zh-CN" ? "中 / EN" : "EN / 中");
+    assert.equal(restored.getAttribute("aria-label"), language === "zh-CN" ? "切换到英文" : "切换到中文");
+
+    env.observer.callback([
+      { type: "childList", removedNodes: [], addedNodes: [restored] },
+      { type: "attributes", target: restored, attributeName: "aria-label" },
+    ]);
+    assert.equal(env.document.getElementById("litellm-zh-toggle"), restored);
+    assert.equal(env.body.childNodes.filter((node) => node.id === "litellm-zh-toggle").length, 1);
+    restored.click();
+    assert.equal(heading.nodeValue, language === "zh-CN" ? "User" : "用户");
+  }
 });
 
 
@@ -265,4 +360,128 @@ test("does not translate code, preformatted, contenteditable, or explicitly igno
   assert.equal(preText.nodeValue, "Page");
   assert.equal(editableText.nodeValue, "Save");
   assert.equal(ignoredText.nodeValue, "New");
+});
+
+
+test("preserves protected attributes when upstream updates them dynamically", () => {
+  const ignored = new Element("div");
+  ignored.setAttribute("data-litellm-zh-ignore", "");
+  const ignoredChild = new Element("span");
+  ignored.appendChild(ignoredChild);
+  const cell = new Element("td");
+  const editable = new Element("div");
+  editable.isContentEditable = true;
+  const code = new Element("code");
+  const protectedElements = [ignoredChild, cell, editable, code];
+  for (const element of protectedElements) {
+    element.setAttribute("title", "User");
+  }
+
+  const env = createEnvironment([ignored, cell, editable, code]);
+  for (const element of protectedElements) {
+    assert.equal(element.getAttribute("title"), "User");
+    element.setAttribute("title", "Admin");
+    env.observer.callback([
+      { type: "attributes", target: element, attributeName: "title" },
+    ]);
+    assert.equal(element.getAttribute("title"), "Admin");
+  }
+
+  env.toggle.click();
+  for (const element of protectedElements) {
+    assert.equal(element.getAttribute("title"), "Admin");
+  }
+});
+
+
+test("translates the audited management labels and restores their exact English", () => {
+  const cases = [
+    ["Traces", "追踪"],
+    ["Investigations", "调查"],
+    ["Find what needs attention", "发现需要关注的问题"],
+    ["Set up traces", "配置追踪"],
+    ["Basic Information (Required)", "基本信息（必填）"],
+    ["Version (Optional)", "版本（可选）"],
+    ["Run an investigation", "运行调查"],
+    ["Add New Skill", "添加技能"],
+    ["No vector stores", "暂无向量存储"],
+    ["Request Lifecycle", "请求生命周期"],
+    ["Cost Breakdown", "成本明细"],
+    ["Create New Policy", "创建新策略"],
+    ["Prompt Details", "提示词详情"],
+    ["Publish Prompt", "发布提示词"],
+    ["No conversations found", "未找到对话"],
+    ["Test Configuration", "测试配置"],
+    ["Regenerate Virtual Key", "重新生成虚拟密钥"],
+    ["Member Permissions", "成员权限"],
+    ["User Settings", "用户设置"],
+    ["Edit Budget", "编辑预算"],
+    ["Configure Model Fallbacks", "配置模型回退"],
+  ];
+  const labels = cases.map(([english]) => {
+    const label = new Element("label");
+    label.appendChild(new TextNode(english));
+    return label;
+  });
+  const env = createEnvironment(labels);
+  assert.deepEqual(labels.map((label) => label.childNodes[0].nodeValue), cases.map(([, chinese]) => chinese));
+  env.toggle.click();
+  assert.deepEqual(labels.map((label) => label.childNodes[0].nodeValue), cases.map(([english]) => english));
+  env.toggle.click();
+  assert.deepEqual(labels.map((label) => label.childNodes[0].nodeValue), cases.map(([, chinese]) => chinese));
+});
+
+
+test("new dictionary words do not translate matching model data, code, or user input", () => {
+  const values = ["Traces", "Investigations", "Project", "System", "Assistant", "Home", "ok", "Live", "Errors", "Completed", "Datasets"];
+  const nodes = [];
+  const containers = [];
+  for (const tag of ["td", "code", "pre", "textarea", "input"]) {
+    for (const value of values) {
+      const element = new Element(tag);
+      const text = new TextNode(value);
+      element.appendChild(text);
+      nodes.push([text, value]);
+      containers.push(element);
+    }
+  }
+  const input = new Element("input");
+  input.value = "Project";
+  input.setAttribute("placeholder", "Enter User ID…");
+  const env = createEnvironment([...containers, input]);
+  assert.equal(input.getAttribute("placeholder"), "输入用户 ID…");
+  for (let i = 0; i < 3; i += 1) {
+    for (const [node, original] of nodes) assert.equal(node.nodeValue, original);
+    assert.equal(input.value, "Project");
+    env.toggle.click();
+  }
+  assert.equal(input.getAttribute("placeholder"), "Enter User ID…");
+});
+
+
+test("translates Open as an action except in a visible table header, where it counts open items", () => {
+  const paletteHint = new Element("span");
+  const paletteText = new TextNode(" Open");
+  paletteHint.appendChild(paletteText);
+  const description = new Element("p");
+  const descriptionText = new TextNode("Open");
+  description.appendChild(descriptionText);
+  const header = new Element("th");
+  const headerText = new TextNode("Open");
+  header.appendChild(headerText);
+  const hiddenHeader = new Element("th");
+  hiddenHeader.setAttribute("class", "px-2 sr-only");
+  const hiddenHeaderText = new TextNode("Open");
+  hiddenHeader.appendChild(hiddenHeaderText);
+  const env = createEnvironment([paletteHint, description, header, hiddenHeader]);
+
+  assert.equal(paletteText.nodeValue, " 打开");
+  assert.equal(descriptionText.nodeValue, "打开");
+  assert.equal(headerText.nodeValue, "待处理");
+  assert.equal(hiddenHeaderText.nodeValue, "打开");
+  env.toggle.click();
+  assert.equal(paletteText.nodeValue, " Open");
+  assert.equal(descriptionText.nodeValue, "Open");
+  assert.equal(headerText.nodeValue, "Open");
+  assert.equal(hiddenHeaderText.nodeValue, "Open");
 });

@@ -58,15 +58,16 @@ def main() -> None:
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1440, "height": 1000})
+        page_errors: list[str] = []
+        page.on("pageerror", lambda error: page_errors.append(str(error)))
 
         page.goto(f"{BASE_URL}/ui/login/", wait_until="domcontentloaded", timeout=45000)
         page.wait_for_selector("#litellm-zh-toggle", timeout=30000)
         page.wait_for_selector('input[placeholder="输入用户名"]', timeout=30000)
         assert page.locator('input[placeholder="输入密码"]').count() == 1
         login_body = page.locator("body").inner_text(timeout=10000)
-        assert "默认情况下，用户名为" in login_body
-        assert "密码为你设置的 LiteLLM Proxy" in login_body
-        assert "需要设置界面凭据或 SSO？" in login_body
+        assert "访问 LiteLLM 管理界面。" in login_body
+        assert "使用 SSO 登录" in login_body
         page.screenshot(path=str(OUTPUT / "00-login-zh.png"), full_page=True)
 
         page.locator('input[placeholder="输入用户名"]').fill(USERNAME)
@@ -86,6 +87,10 @@ def main() -> None:
                 page.goto(expected, wait_until="domcontentloaded", timeout=45000)
                 page.wait_for_selector("#litellm-zh-toggle", timeout=30000)
                 page.wait_for_timeout(1200)
+                page.locator("#litellm-zh-toggle").click()
+                page.wait_for_function("document.documentElement.lang === 'en'")
+                page.locator("#litellm-zh-toggle").click()
+                page.wait_for_function("document.documentElement.lang === 'zh-CN'")
                 current = page.url
                 lang = page.locator("html").get_attribute("lang")
                 body = page.locator("body").inner_text(timeout=10000)
@@ -136,6 +141,8 @@ def main() -> None:
         encoding="utf-8",
     )
     print(json.dumps(results, ensure_ascii=False, indent=2))
+    if page_errors:
+        raise SystemExit(f"browser errors: {page_errors}")
     if failures:
         raise SystemExit(f"{len(failures)} authenticated UI routes failed")
 

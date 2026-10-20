@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 jobs:
-  litellm-1-101:
+  litellm-1-105:
     strategy:
       fail-fast: false
       matrix:
@@ -29,7 +29,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install exact LiteLLM release
-        run: python3 -m pip install --disable-pip-version-check "litellm[proxy]==1.101.0"
+        run: python3 -m pip install --disable-pip-version-check "litellm[proxy]==1.105.1"
 
       - name: Confirm LiteLLM version and packaged UI
         run: |
@@ -39,7 +39,7 @@ jobs:
           from pathlib import Path
 
           version = importlib.metadata.version("litellm")
-          assert version == "1.101.0", version
+          assert version == "1.105.1", version
           spec = importlib.util.find_spec("litellm")
           assert spec and spec.origin
           ui = Path(spec.origin).resolve().parent / "proxy" / "_experimental" / "out"
@@ -175,7 +175,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: litellm-1.101.0-${{ runner.os }}-report
+          name: litellm-1.105.1-${{ runner.os }}-report
           if-no-files-found: ignore
           retention-days: 14
           path: |

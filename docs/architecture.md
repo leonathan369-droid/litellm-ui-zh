@@ -30,6 +30,10 @@ dist/litellm-zh.js
 
 默认使用 exact-match。前后空白可保留，但普通词条不会作为任意子串替换。
 
+少数词条的含义取决于出现位置，由 `src/overlay.js` 中的 `HEADER_TRANSLATIONS` 在词典之前处理：位于可见表头单元格（`th`，且自身不带 `sr-only` class）内时使用表头译法，其他位置仍用词典译法。目前只有 `Open`：表头里是待处理数量列，译为“待处理”；命令面板、说明文字和仅供屏幕阅读器的操作列头里是动作，译为“打开”。
+
+启动时若存在 LiteLLM 的初始 React 加载骨架（`data-spinner-id` 对应的 `Loading...` 容器），先等待该原节点被移除再翻译，避免提前改写 SSR 内容导致 hydration 不匹配。切换按钮被页面移除时会按当前语言恢复。
+
 动态 DOM 状态使用 WeakMap 保存当前 source 与 translated 值。当 React 修改已有 TextNode 或 `aria-label` / `placeholder` / `title` 时，新值会成为新的 source，因此切回英文不会恢复第一次出现的旧内容。
 
 以下区域默认跳过：
