@@ -175,6 +175,7 @@ jobs:
               page.goto("http://127.0.0.1:4000/ui/", wait_until="domcontentloaded", timeout=45000)
               page.wait_for_selector("#litellm-zh-toggle", timeout=30000)
               assert page.locator("html").get_attribute("lang") == "zh-CN"
+              page.wait_for_function("document.title === 'LiteLLM 控制台'")
               assert page.title() == "LiteLLM 控制台"
 
               page.evaluate("document.title = 'AI Gateway'")
@@ -210,6 +211,7 @@ jobs:
               page.locator("#litellm-zh-toggle").click()
               page.wait_for_function("document.documentElement.lang === 'en'")
               assert page.locator("html").get_attribute("lang") == "en"
+              page.wait_for_function("document.title === 'AI Gateway'")
               assert page.title() == "AI Gateway"
               page.wait_for_function(
                   "document.getElementById('litellm-zh-runtime-probe')?.textContent === 'Save'"
