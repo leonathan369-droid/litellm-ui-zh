@@ -7,49 +7,608 @@ on:
 
 permissions:
   contents: read
-  issues: write
+
+concurrency:
+  group: litellm-upstream-watch
+  cancel-in-progress: false
 
 jobs:
   check:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      latest: ${{ steps.upstream.outputs.latest }}
+      tracked: ${{ steps.upstream.outputs.tracked }}
+      update_available: ${{ steps.upstream.outputs.update_available }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.repository.default_branch }}
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.13'
       - id: upstream
         name: Check latest stable LiteLLM release
         run: python3 scripts/check_upstream.py --github-output "$GITHUB_OUTPUT"
-      - name: Open compatibility issue when needed
-        if: steps.upstream.outputs.update_available == 'true'
+
+  adapt:
+    needs: check
+    if: needs.check.outputs.update_available == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+    outputs:
+      manual_review_required: ${{ steps.changes.outputs.manual_review_required }}
+      pr_url: ${{ steps.pull-request.outputs.url }}
+      manual_review_blocked: ${{ steps.wait-checks.outputs.manual_review_blocked }}
+    env:
+      LITELLM_VERSION: ${{ needs.check.outputs.latest }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '20'
+      - name: Require Codex API key
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -z "${OPENAI_API_KEY:-}" ]; then
+            echo "::error::Add the OPENAI_API_KEY Actions secret to enable automatic translation updates."
+            exit 1
+          fi
+      - name: Choose or resume the compatibility branch
+        id: branch
         env:
           GH_TOKEN: ${{ github.token }}
-          LATEST: ${{ steps.upstream.outputs.latest }}
-          TRACKED: ${{ steps.upstream.outputs.tracked }}
-          RELEASE_URL: ${{ steps.upstream.outputs.release_url }}
+          LITELLM_VERSION: ${{ needs.check.outputs.latest }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           set -euo pipefail
-          title="Compatibility: LiteLLM v${LATEST}"
-          existing="$(gh issue list --state open --search "${title} in:title" --json title --jq '.[] | select(.title == "'"$title"'") | .title' | head -n 1)"
-          if [ -n "$existing" ]; then
-            echo "Compatibility issue already exists: $existing"
+          base_sha="$(git rev-parse HEAD)"
+          echo "$base_sha" > "$RUNNER_TEMP/default-base-sha-${GITHUB_RUN_ID}"
+          git show "$base_sha:src/overlay.js" > "$RUNNER_TEMP/overlay-base-${GITHUB_RUN_ID}.js"
+          git show "$base_sha:compatibility/static-unknown-allowlist.json" \
+            > "$RUNNER_TEMP/allowlist-base-${GITHUB_RUN_ID}.json"
+          git show "$base_sha:compatibility/upstream.json" \
+            > "$RUNNER_TEMP/upstream-state-before-${GITHUB_RUN_ID}.json"
+          cp compatibility/upstream-ui-routes.json \
+            "$RUNNER_TEMP/routes-base-${GITHUB_RUN_ID}.json"
+          pull_requests="$(gh pr list --state open --limit 100 \
+            --json number,title,headRefName,headRepositoryOwner,baseRefName,author)"
+          pending_matches="$(jq -c --arg owner "${GITHUB_REPOSITORY%%/*}" --arg base "$DEFAULT_BRANCH" \
+            '[.[] | select(.baseRefName == $base and .headRepositoryOwner.login == $owner and (.title | startswith("Compatibility: LiteLLM")))]' \
+            <<< "$pull_requests")"
+          pending_count="$(jq 'length' <<< "$pending_matches")"
+          if [ "$pending_count" -gt 1 ]; then
+            echo "Multiple open LiteLLM compatibility PRs need attention."
+            exit 1
+          fi
+          pending="$(jq -c '.[0] // empty' <<< "$pending_matches")"
+          if [ -n "$pending" ]; then
+            pending_branch="$(jq -r '.headRefName' <<< "$pending")"
+            wanted_branch="compat/litellm-${LITELLM_VERSION}"
+            pending_author="$(jq -r '.author.login' <<< "$pending")"
+            if [ "$pending_author" != "github-actions[bot]" ]; then
+              echo "The open compatibility PR was not created by the automation bot."
+              exit 1
+            fi
+            if [ "$pending_branch" != "$wanted_branch" ]; then
+              echo "An earlier LiteLLM compatibility PR is still open: $(jq -r '.title' <<< "$pending")"
+              echo "Resolve that PR before starting another release update."
+              exit 1
+            fi
+            git fetch --depth=1 origin "$pending_branch:refs/remotes/origin/$pending_branch"
+            git switch --create "$pending_branch" --track "origin/$pending_branch"
+            echo "pr_number=$(jq -r '.number' <<< "$pending")" >> "$GITHUB_OUTPUT"
+            echo "branch=$pending_branch" >> "$GITHUB_OUTPUT"
+          else
+            branch="compat/litellm-${LITELLM_VERSION}"
+            if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+              echo "The compatibility branch already exists without an automation-owned open PR."
+              exit 1
+            else
+              git switch --create "$branch"
+            fi
+            echo "pr_number=" >> "$GITHUB_OUTPUT"
+            echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Validate resumed branch before any repository code can run
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP/default-base-sha-${GITHUB_RUN_ID}" <<'PY'
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          baseline = Path(sys.argv[1]).read_text(encoding="ascii").strip()
+          allowed = {
+              "src/overlay.js", "locales/zh-CN.json", "dist/litellm-zh.js",
+              "compatibility/upstream.json", "compatibility/static-unknown-allowlist.json",
+              "compatibility/upstream-ui-routes.json", "docs/compatibility.md",
+          }
+          paths = subprocess.check_output(
+              ["git", "diff", "--name-only", "--no-renames", baseline, "HEAD"], text=True
+          ).splitlines()
+          unexpected = sorted(set(paths) - allowed)
+          if unexpected:
+              raise SystemExit(f"resumed compatibility branch has unapproved committed paths: {unexpected}")
+          for name in paths:
+              path = Path(name)
+              current = Path()
+              for part in path.parts:
+                  current /= part
+                  if current.is_symlink():
+                      raise SystemExit(f"resumed compatibility branch contains a symlink: {name}")
+              if not path.is_file():
+                  raise SystemExit(f"resumed compatibility branch removed or replaced a file: {name}")
+          PY
+          default_base_sha="$(cat "$RUNNER_TEMP/default-base-sha-${GITHUB_RUN_ID}")"
+          git diff --check "$default_base_sha" HEAD
+      - name: Download and unpack the exact LiteLLM UI
+        env:
+          LITELLM_VERSION: ${{ needs.check.outputs.latest }}
+        run: |
+          set -euo pipefail
+          python3 -m pip download --disable-pip-version-check --only-binary=:all: --no-deps \
+            --dest "$RUNNER_TEMP/upstream-wheel" "litellm==$LITELLM_VERSION"
+          mkdir -p .upstream-ui
+          python3 - "$RUNNER_TEMP/upstream-wheel" .upstream-ui "$LITELLM_VERSION" <<'PY'
+          import sys
+          import hashlib
+          import json
+          import urllib.request
+          import zipfile
+          from pathlib import Path
+
+          wheel_dir, destination, version = map(Path, sys.argv[1:])
+          matches = list(wheel_dir.glob(f"litellm-{version}-*.whl"))
+          assert len(matches) == 1, matches
+          with urllib.request.urlopen(f"https://pypi.org/pypi/litellm/{version}/json") as response:
+              metadata = json.load(response)
+          distributions = [
+              item for item in metadata["urls"]
+              if item["filename"] == matches[0].name and item["packagetype"] == "bdist_wheel"
+          ]
+          assert len(distributions) == 1, matches[0].name
+          expected_sha256 = distributions[0]["digests"]["sha256"]
+          actual_sha256 = hashlib.sha256(matches[0].read_bytes()).hexdigest()
+          assert actual_sha256 == expected_sha256, (actual_sha256, expected_sha256)
+          print(f"Verified PyPI wheel SHA256: {actual_sha256}")
+          prefix = "litellm/proxy/_experimental/out/"
+          with zipfile.ZipFile(matches[0]) as archive:
+              members = [name for name in archive.namelist() if name.startswith(prefix)]
+              assert any(name.endswith("index.html") for name in members)
+              for name in members:
+                  relative = Path(name[len(prefix):])
+                  if not relative.parts:
+                      continue
+                  if relative.is_absolute() or ".." in relative.parts:
+                      raise ValueError(f"unsafe wheel path: {name}")
+                  target = destination / relative
+                  if name.endswith("/"):
+                      target.mkdir(parents=True, exist_ok=True)
+                  else:
+                      target.parent.mkdir(parents=True, exist_ok=True)
+                      target.write_bytes(archive.read(name))
+          route_paths = sorted(
+              path.relative_to(destination).as_posix()
+              for path in destination.rglob("*.html") if path.is_file()
+          )
+          route_count = len(route_paths)
+          assert route_count > 0
+          import os
+          Path(os.environ["RUNNER_TEMP"], "upstream-route-count").write_text(
+              f"{route_count}\n", encoding="ascii"
+          )
+          Path(os.environ["RUNNER_TEMP"], "upstream-routes.json").write_text(
+              json.dumps({"litellm": str(version), "routes": route_paths}, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          print(f"Verified static HTML routes: {route_count}")
+          PY
+      - name: Isolate Git metadata from the untrusted upstream review
+        id: isolate
+        run: |
+          set -euo pipefail
+          test -d .git && test ! -L .git
+          real_git_dir="$RUNNER_TEMP/real-git-${GITHUB_RUN_ID}"
+          tracked_paths="$RUNNER_TEMP/tracked-paths-${GITHUB_RUN_ID}"
+          test ! -e "$real_git_dir"
+          git ls-files -z > "$tracked_paths"
+          git rev-parse HEAD > "$RUNNER_TEMP/base-sha-${GITHUB_RUN_ID}"
+          git branch --show-current > "$RUNNER_TEMP/base-branch-${GITHUB_RUN_ID}"
+          mv .git "$real_git_dir"
+          git init --quiet
+          git --literal-pathspecs add -A --pathspec-from-file="$tracked_paths" --pathspec-file-nul
+          GIT_AUTHOR_NAME="Codex isolated baseline" \
+          GIT_AUTHOR_EMAIL="codex-isolated-baseline@example.invalid" \
+          GIT_COMMITTER_NAME="Codex isolated baseline" \
+          GIT_COMMITTER_EMAIL="codex-isolated-baseline@example.invalid" \
+            git -c core.hooksPath=/dev/null commit --quiet -m "Isolated baseline for compatibility review"
+          echo "Codex can edit the source tree without access to the real repository metadata."
+      - name: Adapt translations to the new release
+        uses: openai/codex-action@bdf19a4a223ec2549a3e2274a0cf61556bc07675
+        env:
+          LITELLM_VERSION: ${{ needs.check.outputs.latest }}
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          permission-profile: ":workspace"
+          effort: high
+          prompt-file: scripts/prompts/litellm-compatibility-update.md
+      - name: Restore trusted Git metadata
+        if: always() && steps.isolate.outcome == 'success'
+        env:
+          UPDATE_BRANCH: ${{ steps.branch.outputs.branch }}
+        run: |
+          set -euo pipefail
+          real_git_dir="$RUNNER_TEMP/real-git-${GITHUB_RUN_ID}"
+          base_sha="$(cat "$RUNNER_TEMP/base-sha-${GITHUB_RUN_ID}")"
+          base_branch="$(cat "$RUNNER_TEMP/base-branch-${GITHUB_RUN_ID}")"
+          if [ ! -d "$real_git_dir" ] || [ -L "$real_git_dir" ]; then
+            echo "The isolated real Git metadata is unavailable."
+            exit 1
+          fi
+          rm -rf .git
+          mv "$real_git_dir" .git
+          test -d .git && test ! -L .git
+          [ "$(git rev-parse HEAD)" = "$base_sha" ]
+          [ "$(git branch --show-current)" = "$base_branch" ]
+          [ "$base_branch" = "$UPDATE_BRANCH" ]
+          origin_url="$(git remote get-url origin)"
+          push_url="$(git remote get-url --push origin)"
+          [ "${origin_url%.git}" = "https://github.com/leonathan369-droid/litellm-ui-zh" ]
+          [ "${push_url%.git}" = "https://github.com/leonathan369-droid/litellm-ui-zh" ]
+          rm -rf .git/hooks
+          mkdir -p .git/hooks
+          git config --local --replace-all core.hooksPath /dev/null
+          git reset --mixed "$base_sha"
+      - name: Validate and prepare the update
+        id: changes
+        env:
+          LITELLM_VERSION: ${{ needs.check.outputs.latest }}
+          EXISTING_PR_NUMBER: ${{ steps.branch.outputs.pr_number }}
+        run: |
+          set -euo pipefail
+          rm -rf .upstream-ui
+          git clean -fdX
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+
+          allowed = {
+              "src/overlay.js", "locales/zh-CN.json",
+              "compatibility/static-unknown-allowlist.json", "docs/compatibility.md",
+          }
+          status = subprocess.check_output(
+              ["git", "status", "--porcelain", "--untracked-files=all"], text=True
+          )
+          paths = [line[3:] for line in status.splitlines()]
+          unexpected = sorted(set(paths) - allowed)
+          if unexpected:
+              raise SystemExit(f"unexpected files changed by the updater: {unexpected}")
+          for name in paths:
+              path = Path(name)
+              current = Path()
+              for part in path.parts:
+                  current /= part
+                  if current.is_symlink():
+                      raise SystemExit(f"updater created a symlink in an allowed path: {name}")
+              if not path.is_file():
+                  raise SystemExit(f"updater removed or replaced an allowed file: {name}")
+          PY
+          default_base_sha="$(cat "$RUNNER_TEMP/default-base-sha-${GITHUB_RUN_ID}")"
+          python3 - "$default_base_sha" <<'PY'
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          allowed = {
+              "src/overlay.js", "locales/zh-CN.json", "dist/litellm-zh.js",
+              "compatibility/upstream.json", "compatibility/static-unknown-allowlist.json",
+              "compatibility/upstream-ui-routes.json", "docs/compatibility.md",
+          }
+          baseline = sys.argv[1]
+          paths = subprocess.check_output(
+              ["git", "diff", "--name-only", "--no-renames", baseline, "HEAD"], text=True
+          ).splitlines()
+          unexpected = sorted(set(paths) - allowed)
+          if unexpected:
+              raise SystemExit(f"compatibility branch contains unapproved committed paths: {unexpected}")
+          for name in paths:
+              path = Path(name)
+              current = Path()
+              for part in path.parts:
+                  current /= part
+                  if current.is_symlink():
+                      raise SystemExit(f"compatibility branch contains a symlink: {name}")
+              if not path.is_file():
+                  raise SystemExit(f"compatibility branch removed or replaced a file: {name}")
+          PY
+          python3 -m json.tool locales/zh-CN.json > /dev/null
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path("compatibility/static-unknown-allowlist.json").read_text(encoding="utf-8"))
+          assert set(data["allowed"]) == set(data["notes"]), "every allowlisted string needs a note"
+          PY
+          python3 scripts/build_patch.py
+          python3 scripts/build_patch.py --check
+          git diff --check
+          python3 - "$LITELLM_VERSION" \
+            "$RUNNER_TEMP/upstream-state-before-${GITHUB_RUN_ID}.json" \
+            "$RUNNER_TEMP/upstream-route-count" \
+            "$RUNNER_TEMP/overlay-base-${GITHUB_RUN_ID}.js" \
+            "$RUNNER_TEMP/allowlist-base-${GITHUB_RUN_ID}.json" \
+            "$RUNNER_TEMP/routes-base-${GITHUB_RUN_ID}.json" \
+            "$RUNNER_TEMP/upstream-routes.json" \
+            "$RUNNER_TEMP/manual-review-required" <<'PY'
+          import datetime
+          import json
+          import sys
+          from pathlib import Path
+
+          (version, baseline_path, route_count_path, overlay_base_path,
+           allowlist_base_path, route_baseline_path, route_update_path,
+           manual_review_path) = sys.argv[1:]
+          baseline = json.loads(Path(baseline_path).read_text(encoding="utf-8"))
+          state_path = Path("compatibility/upstream.json")
+          state = baseline
+          state["latest_automated_verified"] = version
+          state["verified"] = [
+              record for record in state["verified"] if record["litellm"] != version
+          ]
+          route_count = int(Path(route_count_path).read_text(encoding="ascii").strip())
+          route_manifest = json.loads(Path(route_update_path).read_text(encoding="utf-8"))
+          assert route_manifest["litellm"] == version
+          assert len(route_manifest["routes"]) == route_count
+          review_date = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+          Path("compatibility/upstream-ui-routes.json").write_text(
+              json.dumps(route_manifest, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          state["verified"].append({
+              "litellm": version,
+              "os": ["Ubuntu"],
+              "status": "automated-verified",
+              "date": review_date,
+              "scope": [
+                  "exact package install",
+                  "packaged UI discovery",
+                  "overlay install/check/diagnose",
+                  f"{route_count} static HTML routes",
+                  "LiteLLM process start",
+                  "served UI injection and overlay checksum",
+                  "Chromium title and dynamic translation smoke test",
+                  "English toggle",
+                  "table user-data protection",
+                  "static unknown-string allowlist",
+                  "authenticated Admin UI route review",
+              ],
+          })
+          state_path.write_text(
+              json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+          )
+          doc_path = Path("docs/compatibility.md")
+          doc_lines = doc_path.read_text(encoding="utf-8").splitlines()
+          table_header = "| LiteLLM | 系统 | 日期 | 状态 | 范围 |"
+          try:
+              table_start = doc_lines.index(table_header) + 1
+          except ValueError as error:
+              raise SystemExit("compatibility documentation table header is missing") from error
+          table_end = table_start
+          while table_end < len(doc_lines) and doc_lines[table_end].startswith("|"):
+              table_end += 1
+          table_rows = doc_lines[table_start:table_end]
+          table_rows = [
+              row for row in table_rows
+              if not (len(row.strip("|").split("|")) > 1 and row.strip("|").split("|")[0].strip() == version)
+          ]
+          scope_text = (
+              f"精确包安装、{route_count} 个静态 UI 路由、Overlay 检查、Chromium smoke、"
+              "19 个 Admin UI 核心路由自动检查"
+          )
+          release_row = f"| {version} | Ubuntu | {review_date} | AUTOMATED_VERIFIED | {scope_text} |"
+          table_rows.append(release_row)
+          doc_lines[table_start:table_end] = table_rows
+          doc_path.write_text("\n".join(doc_lines) + "\n", encoding="utf-8")
+          if release_row not in doc_lines:
+              raise SystemExit("trusted compatibility record was not written to the documentation")
+          manual_review = (
+              Path("src/overlay.js").read_bytes() != Path(overlay_base_path).read_bytes()
+              or Path("compatibility/static-unknown-allowlist.json").read_bytes()
+              != Path(allowlist_base_path).read_bytes()
+              or route_manifest["routes"]
+              != json.loads(Path(route_baseline_path).read_text(encoding="utf-8"))["routes"]
+          )
+          Path(manual_review_path).write_text(
+              "true\n" if manual_review else "false\n", encoding="ascii"
+          )
+          PY
+          python3 -m json.tool compatibility/upstream.json > /dev/null
+          git diff --check "$default_base_sha"
+          python3 - <<'PY'
+          allowed = {
+              "src/overlay.js", "locales/zh-CN.json", "dist/litellm-zh.js",
+              "compatibility/upstream.json", "compatibility/static-unknown-allowlist.json",
+              "compatibility/upstream-ui-routes.json", "docs/compatibility.md",
+          }
+          from pathlib import Path
+          import subprocess
+          import os
+          baseline = Path(os.environ["RUNNER_TEMP"], f"default-base-sha-{os.environ['GITHUB_RUN_ID']}").read_text().strip()
+          paths = subprocess.check_output(
+              ["git", "diff", "--name-only", "--no-renames", baseline], text=True
+          ).splitlines()
+          unexpected = sorted(set(paths) - allowed)
+          if unexpected:
+              raise SystemExit(f"unexpected files changed on the compatibility branch: {unexpected}")
+          for name in paths:
+              path = Path(name)
+              current = Path()
+              for part in path.parts:
+                  current /= part
+                  if current.is_symlink():
+                      raise SystemExit(f"compatibility branch contains a symlink: {name}")
+              if not path.is_file():
+                  raise SystemExit(f"compatibility branch removed or replaced a file: {name}")
+          PY
+          changed="$(git status --porcelain --untracked-files=all)"
+          if [ -z "$changed" ] && [ -z "${EXISTING_PR_NUMBER:-}" ]; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          cat > /tmp/upstream-issue.md <<EOF
-          A newer stable LiteLLM release is available.
+          echo "manual_review_required=$(cat "$RUNNER_TEMP/manual-review-required")" >> "$GITHUB_OUTPUT"
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
+      - name: Create or update the compatibility pull request
+        if: steps.changes.outputs.has_changes == 'true'
+        id: pull-request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LITELLM_VERSION: ${{ needs.check.outputs.latest }}
+          UPDATE_BRANCH: ${{ steps.branch.outputs.branch }}
+          EXISTING_PR_NUMBER: ${{ steps.branch.outputs.pr_number }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/overlay.js locales/zh-CN.json dist/litellm-zh.js \
+            compatibility/upstream.json compatibility/static-unknown-allowlist.json \
+            compatibility/upstream-ui-routes.json docs/compatibility.md
+          if ! git diff --cached --quiet; then
+            git commit -m "compat: adapt LiteLLM $LITELLM_VERSION UI"
+          fi
+          gh auth setup-git
+          git push --set-upstream origin "$UPDATE_BRANCH"
+          if [ -n "$EXISTING_PR_NUMBER" ]; then
+            pr_url="$(gh pr view "$EXISTING_PR_NUMBER" --json url --jq .url)"
+          else
+            cat > "$RUNNER_TEMP/compatibility-pr.md" <<EOF
+          Automatically adapted the UI overlay to LiteLLM $LITELLM_VERSION.
 
-          - Latest stable: `v${LATEST}`
-          - Latest compatibility-reviewed here: `v${TRACKED}`
-          - Upstream release: ${RELEASE_URL}
-
-          Maintenance checklist:
-          - [ ] Create/update a compatibility branch.
-          - [ ] Install the exact LiteLLM release in a clean environment.
-          - [ ] Run installer upgrade/check tests.
-          - [ ] Run `scripts/collect_strings.py` on the static UI.
-          - [ ] Review new/changed translations.
-          - [ ] Perform browser smoke tests on key routes.
-          - [ ] Update `compatibility/upstream.json` and `docs/compatibility.md`.
-          - [ ] Release only after manual verification.
+          The workflow downloaded the exact upstream wheel, reviewed its static UI and source strings, updated the Chinese overlay, and will dispatch repository tests against this branch before merging.
           EOF
-          gh issue create --title "$title" --body-file /tmp/upstream-issue.md
+            pr_url="$(gh pr create --base "$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)" \
+              --head "$UPDATE_BRANCH" --title "Compatibility: LiteLLM v$LITELLM_VERSION" \
+              --body-file "$RUNNER_TEMP/compatibility-pr.md")"
+          fi
+          echo "url=$pr_url" >> "$GITHUB_OUTPUT"
+      - name: Dispatch full checks against the pull request branch
+        id: dispatch
+        if: steps.changes.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LITELLM_VERSION: ${{ needs.check.outputs.latest }}
+          UPDATE_BRANCH: ${{ steps.branch.outputs.branch }}
+        run: |
+          set -euo pipefail
+          request_id="compat-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          gh workflow run verify.yml --ref "$UPDATE_BRANCH" -f automation_id="$request_id"
+          gh workflow run compatibility.yml --ref "$UPDATE_BRANCH" \
+            -f litellm_version="$LITELLM_VERSION" -f automation_id="$request_id"
+          gh workflow run admin-ui-route-review.yml --ref "$UPDATE_BRANCH" \
+            -f litellm_version="$LITELLM_VERSION" -f automation_id="$request_id"
+          echo "request_id=$request_id" >> "$GITHUB_OUTPUT"
+      - name: Wait for checks and merge when they pass
+        id: wait-checks
+        if: steps.changes.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LITELLM_VERSION: ${{ needs.check.outputs.latest }}
+          UPDATE_BRANCH: ${{ steps.branch.outputs.branch }}
+          PR_URL: ${{ steps.pull-request.outputs.url }}
+          REQUEST_ID: ${{ steps.dispatch.outputs.request_id }}
+          MANUAL_REVIEW_REQUIRED: ${{ steps.changes.outputs.manual_review_required }}
+        run: |
+          set -euo pipefail
+          head_sha="$(git rev-parse HEAD)"
+          for workflow in verify.yml compatibility.yml admin-ui-route-review.yml; do
+            case "$workflow" in
+              verify.yml) expected_title="Verify / $REQUEST_ID" ;;
+              compatibility.yml) expected_title="LiteLLM Compatibility $LITELLM_VERSION / $REQUEST_ID" ;;
+              admin-ui-route-review.yml) expected_title="Admin UI Route Review $LITELLM_VERSION / $REQUEST_ID" ;;
+            esac
+            run_id=""
+            for attempt in $(seq 1 60); do
+              runs="$(gh run list --workflow "$workflow" --branch "$UPDATE_BRANCH" \
+                --event workflow_dispatch --limit 20 --json databaseId,headSha,displayTitle)"
+              run_id="$(jq -r --arg sha "$head_sha" --arg title "$expected_title" \
+                '[.[] | select(.headSha == $sha and .displayTitle == $title)][0].databaseId // empty' <<< "$runs")"
+              if [ -n "$run_id" ]; then break; fi
+              sleep 10
+            done
+            if [ -z "$run_id" ]; then
+              echo "Timed out waiting for $workflow to start for $head_sha"
+              exit 1
+            fi
+            gh run watch "$run_id" --exit-status
+            run="$(gh run view "$run_id" --json headSha,displayTitle,conclusion)"
+            jq -e --arg sha "$head_sha" --arg title "$expected_title" \
+              '.headSha == $sha and .displayTitle == $title and .conclusion == "success"' \
+              <<< "$run" > /dev/null
+          done
+          pr_number="$(gh pr view "$PR_URL" --json number --jq .number)"
+          pr_head="$(gh pr view "$PR_URL" --json headRefOid --jq .headRefOid)"
+          if [ "$pr_head" != "$head_sha" ]; then
+            echo "The pull request changed after checks passed; refusing to merge an untested commit."
+            exit 1
+          fi
+          if [ "$MANUAL_REVIEW_REQUIRED" = "true" ]; then
+            echo "The exact checks passed, but overlay code, the unknown-string allowlist, or upstream routes changed; leaving the PR open for human review."
+            echo "manual_review_blocked=true" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          repository="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
+          merge="$(gh api "repos/$repository/pulls/$pr_number/merge" --method PUT \
+            --field sha="$head_sha" --field merge_method=squash)"
+          jq -e '.merged == true' <<< "$merge" > /dev/null
+          git push origin --delete "$UPDATE_BRANCH" || \
+            echo "The pull request merged; GitHub kept the compatibility branch."
+
+  report-failure:
+    needs: [check, adapt]
+    if: always() && (needs.check.result == 'failure' || (needs.check.outputs.update_available == 'true' && needs.adapt.result == 'failure'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Report the blocked automatic update
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LITELLM_VERSION: ${{ needs.check.outputs.latest }}
+          MANUAL_REVIEW_BLOCKED: ${{ needs.adapt.outputs.manual_review_blocked }}
+          PR_URL: ${{ needs.adapt.outputs.pr_url }}
+        run: |
+          set -euo pipefail
+          if [ "$MANUAL_REVIEW_BLOCKED" = "true" ] && [ -n "${LITELLM_VERSION:-}" ]; then
+            title="LiteLLM compatibility update needs manual review: v$LITELLM_VERSION"
+            summary="The exact-version checks passed, but the update changes overlay code, its unknown-string allowlist, or the upstream route list. Review the compatibility pull request before merging."
+          elif [ -n "${LITELLM_VERSION:-}" ]; then
+            title="Automatic LiteLLM compatibility update failed: v$LITELLM_VERSION"
+            summary="Automatic compatibility adaptation for LiteLLM v$LITELLM_VERSION needs attention."
+          else
+            title="Automatic LiteLLM stable release check failed"
+            summary="The scheduled check for the latest stable LiteLLM release failed before it could determine whether an update is available."
+          fi
+          existing="$(gh issue list --state open --limit 100 --json title --jq '.[].title' | rg -Fx -- "$title" || true)"
+          if [ -n "$existing" ]; then exit 0; fi
+          cat > "$RUNNER_TEMP/compatibility-failure.md" <<EOF
+          $summary
+
+          Pull request: ${PR_URL:-not created}
+
+          Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+
+          Review the failed step. Common setup requirements are the OPENAI_API_KEY Actions secret and permission for GitHub Actions to create pull requests.
+          EOF
+          gh issue create --title "$title" --body-file "$RUNNER_TEMP/compatibility-failure.md"

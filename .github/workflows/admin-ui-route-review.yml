@@ -1,5 +1,7 @@
 name: Admin UI Route Review
 
+run-name: Admin UI Route Review ${{ inputs.litellm_version || 'latest reviewed' }} / ${{ inputs.automation_id || github.run_id }}
+
 on:
   push:
     paths:
@@ -11,13 +13,24 @@ on:
       - 'compatibility/**'
       - 'tests/admin_ui_route_review.py'
   workflow_dispatch:
+    inputs:
+      litellm_version:
+        description: Exact stable LiteLLM version to verify
+        required: false
+        default: ''
+        type: string
+      automation_id:
+        description: Correlation ID for an automated compatibility update
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
 
 jobs:
   review:
-    name: LiteLLM 1.101 authenticated routes
+    name: LiteLLM ${{ inputs.litellm_version || 'latest reviewed' }} authenticated routes
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -38,12 +51,25 @@ jobs:
       UI_USERNAME: admin
       LITELLM_LOCAL_MODEL_COST_MAP: "True"
       DISABLE_SCHEMA_UPDATE: "true"
+      LITELLM_VERSION: ${{ inputs.litellm_version }}
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.11'
+      - name: Select the exact LiteLLM version
+        run: |
+          set -euo pipefail
+          if [ -z "${LITELLM_VERSION:-}" ]; then
+            LITELLM_VERSION="$(python3 -c 'import json; print(json.load(open("compatibility/upstream.json", encoding="utf-8"))["latest_automated_verified"])')"
+          fi
+          python3 - "$LITELLM_VERSION" <<'PY'
+          import re
+          import sys
+          assert re.fullmatch(r"\d+(?:\.\d+)+", sys.argv[1]), sys.argv[1]
+          PY
+          echo "LITELLM_VERSION=$LITELLM_VERSION" >> "$GITHUB_ENV"
 
       - name: Generate ephemeral UI credentials
         shell: bash
@@ -56,7 +82,7 @@ jobs:
 
       - name: Install exact LiteLLM and Playwright
         run: |
-          python3 -m pip install --disable-pip-version-check "litellm[proxy]==1.101.0" "prisma==0.11.0" "playwright==1.55.0"
+          python3 -m pip install --disable-pip-version-check "litellm[proxy]==$LITELLM_VERSION" "prisma==0.11.0" "playwright==1.55.0"
           python3 -m playwright install --with-deps chromium
 
       - name: Initialize temporary LiteLLM database
@@ -112,7 +138,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: litellm-1.101.0-authenticated-admin-routes
+          name: litellm-${{ inputs.litellm_version || 'latest-reviewed' }}-authenticated-admin-routes
           if-no-files-found: ignore
           retention-days: 14
           path: |

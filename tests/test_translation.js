@@ -76,11 +76,17 @@ function createEnvironment(children = []) {
 
   const document = {
     body,
+    head: new Element("head"),
     documentElement: { dataset: {}, lang: "en" },
     readyState: "complete",
     createElement: (tagName) => new Element(tagName),
     getElementById: (id) => elementsById.get(id) || null,
   };
+
+  const title = new Element("title");
+  const titleText = new TextNode("LiteLLM Dashboard");
+  title.appendChild(titleText);
+  document.head.appendChild(title);
 
   class MutationObserverMock {
     constructor(callback) {
@@ -89,7 +95,9 @@ function createEnvironment(children = []) {
       observers.push(this);
     }
 
-    observe(_target, options) {
+    observe(target, options) {
+      this.targets = this.targets || [];
+      this.targets.push(target);
       this.options = options;
     }
   }
@@ -118,10 +126,25 @@ function createEnvironment(children = []) {
   return {
     body,
     document,
+    titleText,
     observer: observers.at(-1),
     toggle: elementsById.get("litellm-zh-toggle"),
   };
 }
+
+
+test("translates page titles and restores router-updated titles", () => {
+  const env = createEnvironment();
+
+  assert.equal(env.titleText.nodeValue, "LiteLLM 控制台");
+
+  env.titleText.nodeValue = "AI Gateway";
+  env.observer.callback([{ type: "characterData", target: env.titleText }]);
+
+  assert.equal(env.titleText.nodeValue, "AI 网关");
+  env.toggle.click();
+  assert.equal(env.titleText.nodeValue, "AI Gateway");
+});
 
 
 test("restores the exact original English when a Chinese translation is ambiguous", () => {

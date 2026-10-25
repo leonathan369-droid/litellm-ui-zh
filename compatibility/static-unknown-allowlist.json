@@ -1,10 +1,10 @@
 {
   "allowed": [
-    "LiteLLM Dashboard",
+    "Account menu — Undefined Role — signed in as unknown",
     "🚅 LiteLLM"
   ],
   "notes": {
-    "LiteLLM Dashboard": "Document title/product name; the body overlay does not translate the document title.",
+    "Account menu — Undefined Role — signed in as unknown": "Placeholder runtime account text includes dynamic role and username data.",
     "🚅 LiteLLM": "Product brand mark intentionally remains unchanged."
   }
 }
