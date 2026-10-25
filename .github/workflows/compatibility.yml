@@ -138,6 +138,9 @@ jobs:
         run: |
           set -euo pipefail
           target="$RUNNER_TEMP/litellm-ui-zh"
+          master_key="sk-$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+          echo "::add-mask::$master_key"
+          export LITELLM_MASTER_KEY="$master_key"
           export LITELLM_UI_PATH="$target"
           litellm --host 127.0.0.1 --port 4000 > "$RUNNER_TEMP/litellm.log" 2>&1 &
           pid=$!
