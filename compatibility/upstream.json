@@ -1,7 +1,7 @@
 {
   "project": "BerriAI/litellm",
   "latest_verified": "1.99.0",
-  "latest_automated_verified": "1.101.0",
+  "latest_automated_verified": "1.106.3",
   "patch_version": "0.2.0",
   "verified": [
     {
@@ -36,6 +36,26 @@
         "15 core Admin UI routes checked on Linux",
         "manual screenshot review on Linux",
         "translated placeholder regression assertions on audited routes"
+      ]
+    },
+    {
+      "litellm": "1.106.3",
+      "os": [
+        "Ubuntu"
+      ],
+      "status": "automated-verified",
+      "date": "2026-10-25",
+      "scope": [
+        "exact package install",
+        "packaged UI discovery",
+        "overlay install/check/diagnose",
+        "56 static HTML routes",
+        "LiteLLM process start",
+        "served UI injection and overlay checksum",
+        "Chromium smoke test for title translation and restoration",
+        "dynamic UI translation and English toggle",
+        "table user-data protection",
+        "static unknown-string allowlist"
       ]
     }
   ]

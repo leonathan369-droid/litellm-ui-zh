@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 from playwright.sync_api import sync_playwright
 
@@ -32,8 +33,12 @@ EXPECTED_PLACEHOLDERS = {
 
 
 ROUTES = [
+    ("home", "home"),
     ("virtual-keys", "api-keys"),
     ("models", "models-and-endpoints"),
+    ("lens", "lens"),
+    ("model-insights", "model-insights"),
+    ("change-password", "change-password"),
     ("playground", "playground"),
     ("usage", "usage"),
     ("agents", "agents"),
@@ -50,7 +55,25 @@ ROUTES = [
 ]
 
 
+def expected_static_routes() -> set[str]:
+    manifest = json.loads(
+        Path("compatibility/upstream-ui-routes.json").read_text(encoding="utf-8")
+    )
+    version = os.environ["LITELLM_VERSION"]
+    if manifest.get("litellm") != version:
+        raise AssertionError(
+            f"route manifest version {manifest.get('litellm')} does not match LiteLLM {version}"
+        )
+    available = set(manifest["routes"])
+    required = {"login/index.html", *(f"{segment}/index.html" for _, segment in ROUTES)}
+    missing = sorted(required - available)
+    if missing:
+        raise AssertionError(f"LiteLLM {version} package is missing expected route files: {missing}")
+    return available
+
+
 def main() -> None:
+    expected_static_routes()
     OUTPUT.mkdir(parents=True, exist_ok=True)
     results: list[dict[str, object]] = []
     failures: list[dict[str, object]] = []
@@ -83,7 +106,9 @@ def main() -> None:
                 "expected": expected,
             }
             try:
-                page.goto(expected, wait_until="domcontentloaded", timeout=45000)
+                response = page.goto(expected, wait_until="domcontentloaded", timeout=45000)
+                if response is not None and response.status >= 400:
+                    raise AssertionError(f"route returned HTTP {response.status}")
                 page.wait_for_selector("#litellm-zh-toggle", timeout=30000)
                 page.wait_for_timeout(1200)
                 current = page.url
@@ -110,6 +135,10 @@ def main() -> None:
                     raise AssertionError(f"missing translated placeholders: {missing}")
                 if "/ui/login" in current:
                     raise AssertionError("route redirected back to login")
+                if urlparse(current).path.rstrip("/") != urlparse(expected).path.rstrip("/"):
+                    raise AssertionError(f"route redirected to a different page: {current}")
+                if page.locator("h1.next-error-h1").count() or "找不到此页面。" in body:
+                    raise AssertionError("route rendered LiteLLM's not-found page")
                 if lang != "zh-CN":
                     raise AssertionError(f"unexpected document language: {lang}")
                 page.screenshot(

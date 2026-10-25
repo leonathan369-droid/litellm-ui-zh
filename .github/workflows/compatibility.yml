@@ -1,5 +1,7 @@
 name: LiteLLM Compatibility
 
+run-name: LiteLLM Compatibility ${{ inputs.litellm_version || 'latest reviewed' }} / ${{ inputs.automation_id || github.run_id }}
+
 on:
   push:
     paths:
@@ -11,43 +13,84 @@ on:
       - 'compatibility/**'
       - 'tests/**'
   workflow_dispatch:
+    inputs:
+      litellm_version:
+        description: Exact stable LiteLLM version to verify
+        required: false
+        default: ''
+        type: string
+      automation_id:
+        description: Correlation ID for an automated compatibility update
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
 
 jobs:
-  litellm-1-101:
+  litellm-compatibility:
+    name: LiteLLM compatibility (${{ inputs.litellm_version || 'latest reviewed' }})
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    env:
+      LITELLM_VERSION: ${{ inputs.litellm_version }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.11'
+      - name: Select the exact LiteLLM version
+        run: |
+          set -euo pipefail
+          if [ -z "${LITELLM_VERSION:-}" ]; then
+            LITELLM_VERSION="$(python3 -c 'import json; print(json.load(open("compatibility/upstream.json", encoding="utf-8"))["latest_automated_verified"])')"
+          fi
+          python3 - "$LITELLM_VERSION" <<'PY'
+          import re
+          import sys
+          assert re.fullmatch(r"\d+(?:\.\d+)+", sys.argv[1]), sys.argv[1]
+          PY
+          echo "LITELLM_VERSION=$LITELLM_VERSION" >> "$GITHUB_ENV"
 
       - name: Install exact LiteLLM release
-        run: python3 -m pip install --disable-pip-version-check "litellm[proxy]==1.101.0"
+        run: |
+          python3 - "$LITELLM_VERSION" <<'PY'
+          import re
+          import sys
+          assert re.fullmatch(r"\d+(?:\.\d+)+", sys.argv[1]), sys.argv[1]
+          PY
+          python3 -m pip install --disable-pip-version-check "litellm[proxy]==$LITELLM_VERSION"
 
       - name: Confirm LiteLLM version and packaged UI
         run: |
           python3 - <<'PY'
           import importlib.metadata
           import importlib.util
+          import json
           from pathlib import Path
 
           version = importlib.metadata.version("litellm")
-          assert version == "1.101.0", version
+          assert version == __import__("os").environ["LITELLM_VERSION"], version
           spec = importlib.util.find_spec("litellm")
           assert spec and spec.origin
           ui = Path(spec.origin).resolve().parent / "proxy" / "_experimental" / "out"
           assert (ui / "index.html").is_file(), ui
           assert (ui / "_next").is_dir(), ui
+          routes = sorted(path.relative_to(ui).as_posix() for path in ui.rglob("*.html") if path.is_file())
+          state = json.loads(Path("compatibility/upstream.json").read_text(encoding="utf-8"))
+          if version == state["latest_automated_verified"]:
+              route_manifest = json.loads(
+                  Path("compatibility/upstream-ui-routes.json").read_text(encoding="utf-8")
+              )
+              assert route_manifest["litellm"] == version
+              assert route_manifest["routes"] == routes
           print(f"LiteLLM={version}")
           print(f"Packaged UI={ui}")
-          print(f"HTML routes={len(list(ui.rglob('*.html')))}")
+          print(f"HTML routes={len(routes)}")
           PY
 
       - name: Install overlay against real LiteLLM UI
@@ -68,6 +111,8 @@ jobs:
           data = json.load(open(sys.argv[1], encoding="utf-8"))
           allowlist = json.load(open(sys.argv[2], encoding="utf-8"))
           allowed = set(allowlist.get("allowed", []))
+          if allowed != set(allowlist.get("notes", {})):
+              raise SystemExit("every static unknown-string allowlist entry must have an explanation")
           unexpected = sorted(set(data["unknown"]) - allowed)
           missing_expected = sorted(allowed - set(data["unknown"]))
           summary = {
@@ -93,6 +138,9 @@ jobs:
         run: |
           set -euo pipefail
           target="$RUNNER_TEMP/litellm-ui-zh"
+          master_key="sk-$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+          echo "::add-mask::$master_key"
+          export LITELLM_MASTER_KEY="$master_key"
           export LITELLM_UI_PATH="$target"
           litellm --host 127.0.0.1 --port 4000 > "$RUNNER_TEMP/litellm.log" 2>&1 &
           pid=$!
@@ -127,6 +175,11 @@ jobs:
               page.goto("http://127.0.0.1:4000/ui/", wait_until="domcontentloaded", timeout=45000)
               page.wait_for_selector("#litellm-zh-toggle", timeout=30000)
               assert page.locator("html").get_attribute("lang") == "zh-CN"
+              page.wait_for_function("document.title === 'LiteLLM 控制台'")
+              assert page.title() == "LiteLLM 控制台"
+
+              page.evaluate("document.title = 'AI Gateway'")
+              page.wait_for_function("document.title === 'AI 网关'")
 
               # Exercise the live MutationObserver against dynamically added UI
               # and verify exact-match protection for table data in a real browser.
@@ -158,6 +211,8 @@ jobs:
               page.locator("#litellm-zh-toggle").click()
               page.wait_for_function("document.documentElement.lang === 'en'")
               assert page.locator("html").get_attribute("lang") == "en"
+              page.wait_for_function("document.title === 'AI Gateway'")
+              assert page.title() == "AI Gateway"
               page.wait_for_function(
                   "document.getElementById('litellm-zh-runtime-probe')?.textContent === 'Save'"
               )
@@ -175,7 +230,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: litellm-1.101.0-${{ runner.os }}-report
+          name: litellm-${{ inputs.litellm_version || 'latest-reviewed' }}-${{ runner.os }}-report
           if-no-files-found: ignore
           retention-days: 14
           path: |

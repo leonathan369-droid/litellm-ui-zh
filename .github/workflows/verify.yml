@@ -1,8 +1,17 @@
 name: Verify
 
+run-name: Verify / ${{ inputs.automation_id || github.run_id }}
+
 on:
   push:
   pull_request:
+  workflow_dispatch:
+    inputs:
+      automation_id:
+        description: Correlation ID for an automated compatibility update
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read

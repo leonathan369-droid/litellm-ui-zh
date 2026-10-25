@@ -151,6 +151,7 @@
     document.documentElement.lang = language === "zh-CN" ? "zh-CN" : "en";
     document.documentElement.dataset.litellmLanguage = language;
     translateNode(document.body, language);
+    if (document.head) translateNode(document.head, language);
 
     var toggle = document.getElementById("litellm-zh-toggle");
     if (toggle) {
@@ -179,7 +180,7 @@
     addToggle();
     applyLanguage(language);
 
-    new MutationObserver(function (records) {
+    var observer = new MutationObserver(function (records) {
       var activeLanguage = document.documentElement.dataset.litellmLanguage || language;
       records.forEach(function (record) {
         if (record.type === "characterData") {
@@ -196,13 +197,16 @@
           translateNode(node, activeLanguage);
         });
       });
-    }).observe(document.body, {
+    });
+    var observerOptions = {
       childList: true,
       characterData: true,
       attributes: true,
       attributeFilter: TRANSLATABLE_ATTRIBUTES,
       subtree: true,
-    });
+    };
+    observer.observe(document.body, observerOptions);
+    if (document.head) observer.observe(document.head, observerOptions);
   }
 
   if (document.readyState === "loading") {
